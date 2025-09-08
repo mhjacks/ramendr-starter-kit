@@ -1,0 +1,17 @@
+---
+global:
+  pattern: virtualization-starter-kit
+
+  options:
+    useCSV: false
+    syncPolicy: Automatic
+    installPlanApproval: Automatic
+
+  hub:
+    provider: aws
+
+main:
+  clusterGroupName: hub
+  multiSourceConfig:
+    enabled: true
+    clusterGroupChartVersion: 0.9.*
