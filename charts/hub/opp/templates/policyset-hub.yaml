@@ -13,8 +13,4 @@ spec:
     them to work well together. This policy set is focued on the components that install
     to the Advanced Cluster Management hub.
   policies:
-  - policy-acs-central-status
-  - policy-acs-secured-status
   - policy-ocm-observability
-  - policy-odf-status
-  - policy-quay-status
