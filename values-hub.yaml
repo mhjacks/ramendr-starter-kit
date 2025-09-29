@@ -59,6 +59,7 @@ clusterGroup:
         - group: internal.open-cluster-management.io
           kind: ManagedClusterInfo
           jsonPointers:
+            - /
             - /spec/loggingCA
 
     opp-policy:
