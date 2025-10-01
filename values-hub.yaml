@@ -53,10 +53,11 @@ clusterGroup:
       name: acm
       namespace: open-cluster-management
       project: hub
-      #chart: acm
-      repoURL: https://github.com/mbaldessari/acm-chart.git
-      chartVersion: fix-acm-policies-without-clustergroup-label
-      path: "."
+      chart: acm
+      chartVersion: 0.1.*
+      #repoURL: https://github.com/mbaldessari/acm-chart.git
+      #chartVersion: fix-acm-policies-without-clustergroup-label
+      #path: "."
       ignoreDifferences:
         - group: internal.open-cluster-management.io
           kind: ManagedClusterInfo
