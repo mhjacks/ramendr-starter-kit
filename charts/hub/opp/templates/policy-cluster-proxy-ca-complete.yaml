@@ -12,7 +12,7 @@ metadata:
     argocd.argoproj.io/hook: "Skip"
   labels:
     open-cluster-management.io/policy-set: openshift-plus
-  name: policy-cluster-proxy-ca-simple
+  name: policy-cluster-proxy-ca-complete
   namespace: policies
 spec:
   disabled: false
@@ -21,7 +21,7 @@ spec:
       apiVersion: policy.open-cluster-management.io/v1beta1
       kind: ConfigurationPolicy
       metadata:
-        name: policy-cluster-proxy-ca-simple
+        name: policy-cluster-proxy-ca-complete
         annotations:
           argocd.argoproj.io/compare-options: IgnoreExtraneous
       spec:
@@ -31,7 +31,7 @@ spec:
             apiVersion: batch/v1
             kind: Job
             metadata:
-              name: extract-cluster-cas-simple
+              name: extract-and-distribute-cas
               namespace: openshift-config
               labels:
                 app.kubernetes.io/name: cluster-proxy-ca
@@ -51,7 +51,7 @@ spec:
                     - |
                       set -euo pipefail
                       
-                      echo "Starting simplified CA certificate extraction..."
+                      echo "Starting complete CA extraction and distribution..."
                       
                       # Create combined CA bundle
                       CA_BUNDLE_FILE="/tmp/combined-ca-bundle.crt"
@@ -83,18 +83,103 @@ spec:
                       # Clean up duplicates
                       sort "$CA_BUNDLE_FILE" | uniq > "${CA_BUNDLE_FILE}.tmp" && mv "${CA_BUNDLE_FILE}.tmp" "$CA_BUNDLE_FILE"
                       
-                      # Create ConfigMap
-                      echo "Creating cluster-proxy-ca-bundle ConfigMap..."
+                      # Create ConfigMap on hub cluster
+                      echo "Creating cluster-proxy-ca-bundle ConfigMap on hub..."
                       oc create configmap cluster-proxy-ca-bundle \
                         --from-file=ca-bundle.crt="$CA_BUNDLE_FILE" \
                         -n openshift-config \
                         --dry-run=client -o yaml | oc apply -f -
                       
-                      # Update proxy
-                      echo "Updating cluster proxy..."
+                      # Update hub cluster proxy
+                      echo "Updating hub cluster proxy..."
                       oc patch proxy/cluster --type=merge --patch='{"spec":{"trustedCA":{"name":"cluster-proxy-ca-bundle"}}}' || true
                       
-                      echo "CA extraction completed"
+                      # Create policy to distribute CA bundle to managed clusters
+                      echo "Creating distribution policy for managed clusters..."
+                      cat <<EOF | oc apply -f -
+                      apiVersion: policy.open-cluster-management.io/v1beta1
+                      kind: Policy
+                      metadata:
+                        name: policy-cluster-proxy-ca-bundle-distribution
+                        namespace: policies
+                        annotations:
+                          policy.open-cluster-management.io/categories: CA Assessment Authorization and Monitoring
+                          policy.open-cluster-management.io/controls: CA-7 Continuous Monitoring
+                          policy.open-cluster-management.io/standards: NIST SP 800-53
+                      spec:
+                        disabled: false
+                        policy-templates:
+                        - objectDefinition:
+                            apiVersion: policy.open-cluster-management.io/v1beta1
+                            kind: ConfigurationPolicy
+                            metadata:
+                              name: policy-cluster-proxy-ca-bundle-distribution
+                            spec:
+                              object-templates:
+                              - complianceType: musthave
+                                objectDefinition:
+                                  apiVersion: v1
+                                  kind: ConfigMap
+                                  metadata:
+                                    name: cluster-proxy-ca-bundle
+                                    namespace: openshift-config
+                                    labels:
+                                      app.kubernetes.io/name: cluster-proxy-ca
+                                      app.kubernetes.io/component: ca-bundle
+                                      cluster.open-cluster-management.io/type: managed
+                                  data:
+                                    ca-bundle.crt: |
+                      $(echo "$(cat $CA_BUNDLE_FILE)" | sed 's/^/                                      /')
+                              - complianceType: musthave
+                                objectDefinition:
+                                  apiVersion: config.openshift.io/v1
+                                  kind: Proxy
+                                  metadata:
+                                    name: cluster
+                                  spec:
+                                    trustedCA:
+                                      name: cluster-proxy-ca-bundle
+                              remediationAction: enforce
+                              severity: high
+                      EOF
+                      
+                      # Create placement rule for managed clusters
+                      echo "Creating placement rule for managed clusters..."
+                      cat <<EOF | oc apply -f -
+                      apiVersion: apps.open-cluster-management.io/v1
+                      kind: PlacementRule
+                      metadata:
+                        name: placement-cluster-proxy-ca-bundle
+                        namespace: policies
+                      spec:
+                        clusterConditions:
+                        - type: ManagedClusterConditionAvailable
+                          status: "True"
+                        clusterSelector:
+                          matchExpressions:
+                          - key: cluster.open-cluster-management.io/clusterset
+                            operator: Exists
+                      EOF
+                      
+                      # Create placement binding
+                      echo "Creating placement binding..."
+                      cat <<EOF | oc apply -f -
+                      apiVersion: policy.open-cluster-management.io/v1
+                      kind: PlacementBinding
+                      metadata:
+                        name: binding-cluster-proxy-ca-bundle
+                        namespace: policies
+                      placementRef:
+                        name: placement-cluster-proxy-ca-bundle
+                        kind: PlacementRule
+                        apiGroup: apps.open-cluster-management.io
+                      subjects:
+                      - name: policy-cluster-proxy-ca-bundle-distribution
+                        kind: Policy
+                        apiGroup: policy.open-cluster-management.io
+                      EOF
+                      
+                      echo "CA extraction and distribution setup completed"
                     env:
                     - name: KUBECONFIG
                       value: "/var/run/secrets/kubernetes.io/serviceaccount/..data/token"
@@ -133,6 +218,12 @@ spec:
             - apiGroups: ["internal.open-cluster-management.io"]
               resources: ["managedclusterinfos"]
               verbs: ["get", "list"]
+            - apiGroups: ["policy.open-cluster-management.io"]
+              resources: ["policies", "placementrules", "placementbindings"]
+              verbs: ["get", "list", "create", "update", "patch"]
+            - apiGroups: ["apps.open-cluster-management.io"]
+              resources: ["placementrules"]
+              verbs: ["get", "list", "create", "update", "patch"]
         - complianceType: musthave
           objectDefinition:
             apiVersion: rbac.authorization.k8s.io/v1
