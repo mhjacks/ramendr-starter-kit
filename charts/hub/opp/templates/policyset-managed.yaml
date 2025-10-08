@@ -4,7 +4,7 @@ metadata:
   labels:
     open-cluster-management.io/policy-set: openshift-plus
   name: openshift-plus-managed
-  namespace: policies
+  namespace: open-cluster-management
   annotations:
     argocd.argoproj.io/sync-wave: "1"
 spec:

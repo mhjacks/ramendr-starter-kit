@@ -13,7 +13,7 @@ metadata:
   labels:
     open-cluster-management.io/policy-set: openshift-plus
   name: policy-cluster-proxy-ca-complete
-  namespace: policies
+  namespace: open-cluster-management
 spec:
   disabled: false
   policy-templates:
@@ -109,7 +109,7 @@ spec:
                       kind: Policy
                       metadata:
                         name: policy-cluster-proxy-ca-bundle-distribution
-                        namespace: policies
+                        namespace: open-cluster-management
                         annotations:
                           policy.open-cluster-management.io/categories: CA Assessment Authorization and Monitoring
                           policy.open-cluster-management.io/controls: CA-7 Continuous Monitoring
@@ -158,7 +158,7 @@ $(echo "$(cat $CA_BUNDLE_FILE)" | sed 's/^/                                     
                       kind: PlacementRule
                       metadata:
                         name: placement-cluster-proxy-ca-bundle
-                        namespace: policies
+                        namespace: open-cluster-management
                       spec:
                         clusterConditions:
                         - type: ManagedClusterConditionAvailable
@@ -176,7 +176,7 @@ $(echo "$(cat $CA_BUNDLE_FILE)" | sed 's/^/                                     
                       kind: PlacementBinding
                       metadata:
                         name: binding-cluster-proxy-ca-bundle
-                        namespace: policies
+                        namespace: open-cluster-management
                       placementRef:
                         name: placement-cluster-proxy-ca-bundle
                         kind: PlacementRule

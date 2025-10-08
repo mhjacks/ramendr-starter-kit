@@ -13,7 +13,7 @@ metadata:
   labels:
     open-cluster-management.io/policy-set: openshift-plus
   name: policy-cluster-proxy-ca-simple
-  namespace: policies
+  namespace: open-cluster-management
 spec:
   disabled: false
   policy-templates:

@@ -13,7 +13,7 @@ metadata:
   labels:
     open-cluster-management.io/policy-set: openshift-plus
   name: policy-ocm-observability
-  namespace: policies
+  namespace: open-cluster-management
 spec:
   disabled: false
   policy-templates:
