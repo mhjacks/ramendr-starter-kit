@@ -6,7 +6,7 @@ metadata:
   name: binding-openshift-plus-hub
   namespace: open-cluster-management
   annotations:
-    argocd.argoproj.io/sync-wave: "3"
+    argocd.argoproj.io/sync-wave: "4"
 placementRef:
   name: placement-openshift-plus-hub
   kind: Placement
