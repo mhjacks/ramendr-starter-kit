@@ -49,10 +49,10 @@ spec:
                     image: registry.redhat.io/openshift4/ose-cli:latest
                     resources:
                       requests:
-                        memory: "64Mi"
+                        memory: "256Mi"
                         cpu: "100m"
                       limits:
-                        memory: "128Mi"
+                        memory: "512Mi"
                         cpu: "200m"
                     command:
                     - /bin/bash
@@ -110,7 +110,7 @@ spec:
                   restartPolicy: Never
                   serviceAccountName: ca-extractor-sa
               backoffLimit: 1
-              activeDeadlineSeconds: 300
+              activeDeadlineSeconds: 600
         - complianceType: musthave
           objectDefinition:
             apiVersion: v1
