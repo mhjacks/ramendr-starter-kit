@@ -25,9 +25,9 @@ clusterGroup:
       name: odf-operator
       namespace: openshift-storage
 
-  #projects:
-  #  - hub
-  #  - opp
+  projects:
+    - hub
+    - opp
   # Explicitly mention the cluster-state based overrides we plan to use for this pattern.
   # We can use self-referential variables because the chart calls the tpl function with these variables defined
   sharedValueFiles:
@@ -52,7 +52,7 @@ clusterGroup:
     acm:
       name: acm
       namespace: open-cluster-management
-      #project: hub
+      project: hub
       chart: acm
       chartVersion: 0.1.*
       #repoURL: https://github.com/mbaldessari/acm-chart.git
@@ -67,7 +67,7 @@ clusterGroup:
     opp-policy:
       name: opp-policy
       namespace: openshift
-      #project: opp
+      project: opp
       path: charts/hub/opp
       syncPolicy:
         automated: {}
@@ -92,7 +92,7 @@ clusterGroup:
     rdr:
       name: regional-dr
       namespace: regional-dr
-      #project: opp
+      project: opp
       path: charts/hub/rdr
       ignoreDifferences:
         - group: internal.open-cluster-management.io
@@ -103,27 +103,27 @@ clusterGroup:
     rdrtrigger:
       name: regional-dr-trigger
       namespace: regional-dr-trigger
-      #project: opp
+      project: opp
       path: charts/hub/rdrtrigger
 
     vault:
       name: vault
       namespace: vault
-      #project: hub
+      project: hub
       chart: hashicorp-vault
       chartVersion: 0.1.*
 
     golang-external-secrets:
       name: golang-external-secrets
       namespace: golang-external-secrets
-      #project: hub
+      project: hub
       chart: golang-external-secrets
       chartVersion: 0.1.*
 
     odf:
       name: odf
       namespace: openshift-storage
-      #project: opp
+      project: opp
       chart: openshift-data-foundations
       chartVersion: 0.2.*
       extraValueFiles:

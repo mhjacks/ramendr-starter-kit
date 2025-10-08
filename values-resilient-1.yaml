@@ -33,8 +33,8 @@ clusterGroup:
       name: odf-operator
       namespace: openshift-storage
 
-  #projects:
-  #  - resilient
+  projects:
+    - resilient
 
   imperative:
     jobs:
@@ -68,7 +68,7 @@ clusterGroup:
     ensure-openshift-console-plugins:
       name: ensure-openshift-console-plugins
       namespace: openshift-console
-      #project: resilient
+      project: resilient
       chart: ensure-openshift-console-plugins
       chartVersion: 0.1.*
       extraValueFiles:
@@ -77,21 +77,21 @@ clusterGroup:
     golang-external-secrets:
       name: golang-external-secrets
       namespace: golang-external-secrets
-      #project: resilient
+      project: resilient
       chart: golang-external-secrets
       chartVersion: 0.1.*
 
     openshift-cnv:
       name: openshift-cnv
       namespace: openshift-cnv
-      #project: resilient
+      project: resilient
       chart: openshift-virtualization-instance
       chartVersion: 0.1.*
 
     odf:
       name: odf
       namespace: openshift-storage
-      #project: resilient
+      project: resilient
       #repoURL: https://github.com/mhjacks/openshift-data-foundations-chart.git
       #chartVersion: fix_sync_hooks
       #path: "."
@@ -103,7 +103,7 @@ clusterGroup:
     node-health-check-operator:
       name: node-health-check-operator
       namespace: openshift-workload-availability
-      #project: resilient
+      project: resilient
       chart: node-health-check-operator
       chartVersion: 0.1.*
 
