@@ -9,8 +9,8 @@ metadata:
     argocd.argoproj.io/sync-wave: "3"
 placementRef:
   name: placement-openshift-plus-hub
-  kind: Placement
-  apiGroup: cluster.open-cluster-management.io
+  kind: PlacementRule
+  apiGroup: apps.open-cluster-management.io
 subjects:
 - name: openshift-plus-hub
   kind: PolicySet
