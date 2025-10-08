@@ -155,7 +155,7 @@ spec:
                       # Create placement rule for managed clusters
                       echo "Creating placement rule for managed clusters..."
                       cat <<EOF | oc apply -f -
-                      apiVersion: cluster.open-cluster-management.io/v1
+                      apiVersion: cluster.open-cluster-management.io/v1beta1
                       kind: Placement
                       metadata:
                         name: placement-cluster-proxy-ca-bundle
