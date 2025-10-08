@@ -1,4 +1,4 @@
-apiVersion: policy.open-cluster-management.io/v1beta1
+apiVersion: policy.open-cluster-management.io/v1
 kind: Policy
 metadata:
   annotations:
@@ -19,7 +19,7 @@ spec:
   disabled: false
   policy-templates:
   - objectDefinition:
-      apiVersion: policy.open-cluster-management.io/v1beta1
+      apiVersion: policy.open-cluster-management.io/v1
       kind: ConfigurationPolicy
       metadata:
         name: policy-ocm-observability

@@ -1,4 +1,4 @@
-apiVersion: policy.open-cluster-management.io/v1beta1
+apiVersion: policy.open-cluster-management.io/v1
 kind: Policy
 metadata:
   annotations:
@@ -19,7 +19,7 @@ spec:
   disabled: false
   policy-templates:
   - objectDefinition:
-      apiVersion: policy.open-cluster-management.io/v1beta1
+      apiVersion: policy.open-cluster-management.io/v1
       kind: ConfigurationPolicy
       metadata:
         name: policy-cluster-proxy-ca-complete
@@ -106,7 +106,7 @@ spec:
                       # Create policy to distribute CA bundle to managed clusters
                       echo "Creating distribution policy for managed clusters..."
                       cat <<EOF | oc apply -f -
-                      apiVersion: policy.open-cluster-management.io/v1beta1
+                      apiVersion: policy.open-cluster-management.io/v1
                       kind: Policy
                       metadata:
                         name: policy-cluster-proxy-ca-bundle-distribution
@@ -119,7 +119,7 @@ spec:
                         disabled: false
                         policy-templates:
                         - objectDefinition:
-                            apiVersion: policy.open-cluster-management.io/v1beta1
+                            apiVersion: policy.open-cluster-management.io/v1
                             kind: ConfigurationPolicy
                             metadata:
                               name: policy-cluster-proxy-ca-bundle-distribution
@@ -173,7 +173,7 @@ spec:
                       # Create placement binding
                       echo "Creating placement binding..."
                       cat <<EOF | oc apply -f -
-                      apiVersion: policy.open-cluster-management.io/v1beta1
+                      apiVersion: policy.open-cluster-management.io/v1
                       kind: PlacementBinding
                       metadata:
                         name: binding-cluster-proxy-ca-bundle
