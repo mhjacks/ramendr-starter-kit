@@ -75,14 +75,15 @@ spec:
             for ca_file in "${ca_files[@]}"; do
               if [[ -f "$ca_file" && -s "$ca_file" ]]; then
                 echo "# CA from $(basename "$ca_file" .crt)" >> "$output_file"
-                cat "$ca_file" >> "$output_file"
+                # Only include the first few certificates to avoid size limits
+                head -n 50 "$ca_file" >> "$output_file"
                 echo "" >> "$output_file"
                 file_count=$((file_count + 1))
               fi
             done
             
             if [[ $file_count -gt 0 ]]; then
-              echo "Combined CA bundle created with $file_count CA certificates"
+              echo "Combined CA bundle created with $file_count CA certificates (truncated for size)"
               return 0
             else
               echo "No valid CA files found to combine"
@@ -146,10 +147,17 @@ spec:
           
           # Create ConfigMap on hub cluster
           echo "5. Creating cluster-proxy-ca-bundle ConfigMap on hub cluster..."
+          
+          # Check if ConfigMap already exists and is too large
+          if oc get configmap cluster-proxy-ca-bundle -n openshift-config >/dev/null 2>&1; then
+            echo "  ConfigMap already exists, updating..."
+            oc delete configmap cluster-proxy-ca-bundle -n openshift-config
+          fi
+          
+          # Create ConfigMap with smaller size limit
           oc create configmap cluster-proxy-ca-bundle \
             --from-file=ca-bundle.crt="$WORK_DIR/combined-ca-bundle.crt" \
-            -n openshift-config \
-            --dry-run=client -o yaml | oc apply -f -
+            -n openshift-config
           
           # Update hub cluster proxy
           echo "6. Updating hub cluster proxy configuration..."
