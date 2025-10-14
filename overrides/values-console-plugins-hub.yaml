@@ -2,3 +2,4 @@
 ensureConsolePlugins:
   - odf-console
   - gitops-plugin
+  - odf-multicluster-console
