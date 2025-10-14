@@ -4,8 +4,8 @@ storageSystem:
   inventory:
     useSpecificNodes: false
 
-odf:
-  enable_mirroring: true
+#odf:
+#  enable_mirroring: true
 
 objectStorage:
   enable: true
