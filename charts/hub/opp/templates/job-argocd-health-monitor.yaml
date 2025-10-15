@@ -1,0 +1,221 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: argocd-health-monitor
+  namespace: open-cluster-management
+  labels:
+    app.kubernetes.io/name: argocd-health-monitor
+    app.kubernetes.io/component: health-check
+  annotations:
+    argocd.argoproj.io/hook: "PostSync"
+    argocd.argoproj.io/hook-delete-policy: "HookSucceeded"
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: argocd-health-monitor
+        image: registry.redhat.io/openshift4/ose-cli:latest
+        command:
+        - /bin/bash
+        - -c
+        - |
+          set -euo pipefail
+          
+          echo "Starting ArgoCD health monitoring and remediation..."
+          
+          # Configuration
+          MAX_ATTEMPTS=5
+          SLEEP_INTERVAL=30
+          ARGOCD_NAMESPACE="argocd"
+          HEALTH_CHECK_TIMEOUT=60
+          
+          # Function to check if a cluster is wedged
+          check_cluster_wedged() {
+            local cluster="$1"
+            local kubeconfig="$2"
+            
+            echo "Checking if $cluster is wedged..."
+            
+            # Check if we can connect to the cluster
+            if ! oc --kubeconfig="$kubeconfig" get nodes --request-timeout=10s &>/dev/null; then
+              echo "❌ Cannot connect to $cluster - cluster appears wedged"
+              return 0
+            fi
+            
+            # Check if ArgoCD server is responding
+            local argocd_server_pods=$(oc --kubeconfig="$kubeconfig" get pods -n "$ARGOCD_NAMESPACE" -l app.kubernetes.io/name=argocd-server --no-headers 2>/dev/null | wc -l)
+            if [[ $argocd_server_pods -eq 0 ]]; then
+              echo "❌ No ArgoCD server pods found on $cluster - cluster appears wedged"
+              return 0
+            fi
+            
+            # Check if ArgoCD server is ready
+            local ready_pods=$(oc --kubeconfig="$kubeconfig" get pods -n "$ARGOCD_NAMESPACE" -l app.kubernetes.io/name=argocd-server --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l)
+            if [[ $ready_pods -eq 0 ]]; then
+              echo "❌ No ready ArgoCD server pods on $cluster - cluster appears wedged"
+              return 0
+            fi
+            
+            # Check ArgoCD server health endpoint
+            local server_pod=$(oc --kubeconfig="$kubeconfig" get pods -n "$ARGOCD_NAMESPACE" -l app.kubernetes.io/name=argocd-server --field-selector=status.phase=Running -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+            if [[ -n "$server_pod" ]]; then
+              if ! oc --kubeconfig="$kubeconfig" exec -n "$ARGOCD_NAMESPACE" "$server_pod" -- curl -s -f http://localhost:8080/healthz --max-time 10 &>/dev/null; then
+                echo "❌ ArgoCD server health check failed on $cluster - cluster appears wedged"
+                return 0
+              fi
+            fi
+            
+            echo "✅ $cluster appears healthy"
+            return 1
+          }
+          
+          # Function to remediate a wedged cluster
+          remediate_wedged_cluster() {
+            local cluster="$1"
+            local kubeconfig="$2"
+            
+            echo "🔧 Remediating wedged cluster: $cluster"
+            
+            # Delete all ArgoCD pods to force restart
+            echo "  Deleting ArgoCD pods on $cluster..."
+            oc --kubeconfig="$kubeconfig" delete pods -n "$ARGOCD_NAMESPACE" --all --grace-period=0 --force &>/dev/null || true
+            
+            # Wait for pods to restart
+            echo "  Waiting for ArgoCD pods to restart on $cluster..."
+            local attempt=1
+            while [[ $attempt -le 30 ]]; do
+              local running_pods=$(oc --kubeconfig="$kubeconfig" get pods -n "$ARGOCD_NAMESPACE" --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l)
+              local total_pods=$(oc --kubeconfig="$kubeconfig" get pods -n "$ARGOCD_NAMESPACE" --no-headers 2>/dev/null | wc -l)
+              
+              if [[ $running_pods -gt 0 && $running_pods -eq $total_pods ]]; then
+                echo "  ✅ ArgoCD pods restarted successfully on $cluster"
+                break
+              fi
+              
+              echo "  Waiting for pods to restart... (attempt $attempt/30)"
+              sleep 10
+              ((attempt++))
+            done
+            
+            if [[ $attempt -gt 30 ]]; then
+              echo "  ⚠️  ArgoCD pods may not have fully restarted on $cluster"
+            fi
+            
+            # Trigger ArgoCD refresh/sync
+            echo "  Triggering ArgoCD refresh on $cluster..."
+            local server_pod=$(oc --kubeconfig="$kubeconfig" get pods -n "$ARGOCD_NAMESPACE" -l app.kubernetes.io/name=argocd-server --field-selector=status.phase=Running -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+            if [[ -n "$server_pod" ]]; then
+              # Trigger refresh of all applications
+              oc --kubeconfig="$kubeconfig" exec -n "$ARGOCD_NAMESPACE" "$server_pod" -- argocd app list -o name | while read app; do
+                if [[ -n "$app" ]]; then
+                  echo "    Refreshing $app..."
+                  oc --kubeconfig="$kubeconfig" exec -n "$ARGOCD_NAMESPACE" "$server_pod" -- argocd app get "$app" --refresh &>/dev/null || true
+                fi
+              done
+              
+              # Trigger hard refresh
+              oc --kubeconfig="$kubeconfig" exec -n "$ARGOCD_NAMESPACE" "$server_pod" -- argocd app list -o name | while read app; do
+                if [[ -n "$app" ]]; then
+                  echo "    Hard refreshing $app..."
+                  oc --kubeconfig="$kubeconfig" exec -n "$ARGOCD_NAMESPACE" "$server_pod" -- argocd app get "$app" --hard-refresh &>/dev/null || true
+                fi
+              done
+            fi
+            
+            echo "  ✅ Remediation completed for $cluster"
+          }
+          
+          # Function to download kubeconfig for a cluster
+          download_kubeconfig() {
+            local cluster="$1"
+            local kubeconfig_path="/tmp/${cluster}-kubeconfig.yaml"
+            
+            echo "Downloading kubeconfig for $cluster..."
+            if oc get secret "${cluster}-import" -n "${cluster}" -o jsonpath='{.data.kubeconfig}' | base64 -d > "$kubeconfig_path" 2>/dev/null; then
+              # Validate kubeconfig
+              if oc --kubeconfig="$kubeconfig_path" get nodes --request-timeout=5s &>/dev/null; then
+                echo "Kubeconfig downloaded and validated for $cluster"
+                return 0
+              else
+                echo "Kubeconfig for $cluster is invalid or cluster is unreachable"
+                return 1
+              fi
+            else
+              echo "Failed to download kubeconfig for $cluster"
+              return 1
+            fi
+          }
+          
+          # Main monitoring loop
+          attempt=1
+          while [[ $attempt -le $MAX_ATTEMPTS ]]; do
+            echo "=== ArgoCD Health Check Attempt $attempt/$MAX_ATTEMPTS ==="
+            
+            # Get list of managed clusters
+            MANAGED_CLUSTERS=$(oc get managedclusters -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || echo "")
+            
+            if [[ -z "$MANAGED_CLUSTERS" ]]; then
+              echo "No managed clusters found"
+              sleep $SLEEP_INTERVAL
+              ((attempt++))
+              continue
+            fi
+            
+            echo "Found managed clusters: $MANAGED_CLUSTERS"
+            
+            wedged_clusters=()
+            
+            # Check each managed cluster
+            for cluster in $MANAGED_CLUSTERS; do
+              if [[ "$cluster" == "local-cluster" ]]; then
+                continue
+              fi
+              
+              echo "Checking cluster: $cluster"
+              
+              # Download kubeconfig
+              if download_kubeconfig "$cluster"; then
+                kubeconfig_path="/tmp/${cluster}-kubeconfig.yaml"
+                
+                # Check if cluster is wedged
+                if check_cluster_wedged "$cluster" "$kubeconfig_path"; then
+                  wedged_clusters+=("$cluster")
+                fi
+              else
+                echo "⚠️  Cannot access $cluster - may be wedged"
+                wedged_clusters+=("$cluster")
+              fi
+            done
+            
+            # Remediate wedged clusters
+            if [[ ${#wedged_clusters[@]} -gt 0 ]]; then
+              echo "Found wedged clusters: ${wedged_clusters[*]}"
+              
+              for cluster in "${wedged_clusters[@]}"; do
+                if download_kubeconfig "$cluster"; then
+                  kubeconfig_path="/tmp/${cluster}-kubeconfig.yaml"
+                  remediate_wedged_cluster "$cluster" "$kubeconfig_path"
+                else
+                  echo "⚠️  Cannot remediate $cluster - kubeconfig is invalid"
+                fi
+              done
+              
+              echo "✅ Remediation completed for wedged clusters"
+            else
+              echo "✅ All clusters are healthy"
+            fi
+            
+            # Wait before next check
+            if [[ $attempt -lt $MAX_ATTEMPTS ]]; then
+              echo "Waiting $SLEEP_INTERVAL seconds before next check..."
+              sleep $SLEEP_INTERVAL
+            fi
+            
+            ((attempt++))
+          done
+          
+          echo "🎉 ArgoCD health monitoring completed"
+      serviceAccountName: argocd-health-monitor
