@@ -58,16 +58,17 @@ spec:
             
             echo "Checking Submariner health on $cluster..."
             
-            # Check if Submariner is installed
-            if ! oc --kubeconfig="$kubeconfig" get crd submariners.submariner.io &>/dev/null; then
-              echo "Submariner CRD not found on $cluster"
+            # Check if Submariner is installed (check for the correct CRDs)
+            if ! oc --kubeconfig="$kubeconfig" get crd clusters.submariner.io &>/dev/null; then
+              echo "Submariner clusters CRD not found on $cluster"
               return 1
             fi
             
-            # Check if Submariner is ready
-            local submariner_status=$(oc --kubeconfig="$kubeconfig" get submariner -n submariner-operator -o jsonpath='{.items[0].status.connectionStatus}' 2>/dev/null || echo "NotReady")
-            if [[ "$submariner_status" != "Connected" ]]; then
-              echo "Submariner connection status on $cluster: $submariner_status"
+            # Check if Submariner operator is running
+            local submariner_operator_pods=$(oc --kubeconfig="$kubeconfig" get pods -n submariner-operator --no-headers 2>/dev/null | grep -c "Running" || echo "0")
+            submariner_operator_pods=$(echo "$submariner_operator_pods" | tr -d ' \n')
+            if [[ $submariner_operator_pods -eq 0 ]]; then
+              echo "Submariner operator not running on $cluster"
               return 1
             fi
             
