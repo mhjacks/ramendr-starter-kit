@@ -10,7 +10,7 @@ metadata:
     argocd.argoproj.io/sync-options: Prune=false
     argocd.argoproj.io/health-check-ignore: "true"
     argocd.argoproj.io/hook: "PostSync"
-    argocd.argoproj.io/sync-wave: "3"
+    argocd.argoproj.io/sync-wave: "4"
   labels:
     app.kubernetes.io/name: odf-managed-cluster-ssl
     app.kubernetes.io/component: policy
