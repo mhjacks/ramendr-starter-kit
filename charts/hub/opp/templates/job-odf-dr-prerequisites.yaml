@@ -27,6 +27,7 @@ spec:
           echo "Starting ODF DR prerequisites check..."
           
           # Configuration
+          HUB_CLUSTER="local-cluster"
           PRIMARY_CLUSTER="ocp-primary"
           SECONDARY_CLUSTER="ocp-secondary"
           KUBECONFIG_DIR="/tmp/kubeconfigs"
@@ -52,7 +53,7 @@ spec:
             fi
           }
           
-          # Function to check Submariner health
+          # Function to check Submariner health and connectivity
           check_submariner_health() {
             local cluster="$1"
             local kubeconfig="$2"
@@ -80,6 +81,68 @@ spec:
             fi
             
             echo "Submariner is healthy on $cluster"
+            return 0
+          }
+          
+          # Function to check Submariner connectivity between clusters
+          check_submariner_connectivity() {
+            local primary_kubeconfig="$1"
+            local secondary_kubeconfig="$2"
+            
+            echo "Checking Submariner connectivity between ocp-primary and ocp-secondary..."
+            
+            # Get cluster IDs
+            local primary_cluster_id=$(oc --kubeconfig="$primary_kubeconfig" get submariner -n submariner-operator -o jsonpath='{.items[0].status.clusterId}' 2>/dev/null || echo "")
+            local secondary_cluster_id=$(oc --kubeconfig="$secondary_kubeconfig" get submariner -n submariner-operator -o jsonpath='{.items[0].status.clusterId}' 2>/dev/null || echo "")
+            
+            if [[ -z "$primary_cluster_id" || -z "$secondary_cluster_id" ]]; then
+              echo "Could not retrieve cluster IDs from Submariner"
+              return 1
+            fi
+            
+            echo "Primary cluster ID: $primary_cluster_id"
+            echo "Secondary cluster ID: $secondary_cluster_id"
+            
+            # Check if clusters can see each other's endpoints
+            local primary_endpoints=$(oc --kubeconfig="$primary_kubeconfig" get endpoints -n submariner-operator submariner-cable-driver -o jsonpath='{.subsets[*].addresses[*].ip}' 2>/dev/null || echo "")
+            local secondary_endpoints=$(oc --kubeconfig="$secondary_kubeconfig" get endpoints -n submariner-operator submariner-cable-driver -o jsonpath='{.subsets[*].addresses[*].ip}' 2>/dev/null || echo "")
+            
+            if [[ -z "$primary_endpoints" || -z "$secondary_endpoints" ]]; then
+              echo "Could not retrieve Submariner endpoints"
+              return 1
+            fi
+            
+            echo "Primary endpoints: $primary_endpoints"
+            echo "Secondary endpoints: $secondary_endpoints"
+            
+            # Check if clusters are in each other's cluster list
+            local primary_clusters=$(oc --kubeconfig="$primary_kubeconfig" get clusters.submariner.io -n submariner-operator -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || echo "")
+            local secondary_clusters=$(oc --kubeconfig="$secondary_kubeconfig" get clusters.submariner.io -n submariner-operator -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || echo "")
+            
+            if [[ "$primary_clusters" != *"$secondary_cluster_id"* ]]; then
+              echo "Secondary cluster ($secondary_cluster_id) not found in primary cluster's cluster list: $primary_clusters"
+              return 1
+            fi
+            
+            if [[ "$secondary_clusters" != *"$primary_cluster_id"* ]]; then
+              echo "Primary cluster ($primary_cluster_id) not found in secondary cluster's cluster list: $secondary_clusters"
+              return 1
+            fi
+            
+            # Check connection status between clusters
+            local connection_status=$(oc --kubeconfig="$primary_kubeconfig" get clusters.submariner.io "$secondary_cluster_id" -n submariner-operator -o jsonpath='{.status.connectionStatus}' 2>/dev/null || echo "Unknown")
+            if [[ "$connection_status" != "Connected" ]]; then
+              echo "Connection status from primary to secondary: $connection_status"
+              return 1
+            fi
+            
+            local reverse_connection_status=$(oc --kubeconfig="$secondary_kubeconfig" get clusters.submariner.io "$primary_cluster_id" -n submariner-operator -o jsonpath='{.status.connectionStatus}' 2>/dev/null || echo "Unknown")
+            if [[ "$reverse_connection_status" != "Connected" ]]; then
+              echo "Connection status from secondary to primary: $reverse_connection_status"
+              return 1
+            fi
+            
+            echo "✅ Submariner connectivity verified between ocp-primary and ocp-secondary"
             return 0
           }
           
@@ -145,6 +208,99 @@ spec:
             return 0
           }
           
+          # Function to check CA material completeness across all clusters
+          check_ca_material_completeness() {
+            local hub_kubeconfig="$1"
+            local primary_kubeconfig="$2"
+            local secondary_kubeconfig="$3"
+            
+            echo "Checking CA material completeness across all clusters..."
+            
+            # Extract CA bundle from each cluster
+            local hub_ca_bundle=$(oc --kubeconfig="$hub_kubeconfig" get configmap cluster-proxy-ca-bundle -n openshift-config -o jsonpath='{.data.ca-bundle\.crt}' 2>/dev/null || echo "")
+            local primary_ca_bundle=$(oc --kubeconfig="$primary_kubeconfig" get configmap cluster-proxy-ca-bundle -n openshift-config -o jsonpath='{.data.ca-bundle\.crt}' 2>/dev/null || echo "")
+            local secondary_ca_bundle=$(oc --kubeconfig="$secondary_kubeconfig" get configmap cluster-proxy-ca-bundle -n openshift-config -o jsonpath='{.data.ca-bundle\.crt}' 2>/dev/null || echo "")
+            
+            # Check if all CA bundles exist and have reasonable size
+            if [[ -z "$hub_ca_bundle" || ${#hub_ca_bundle} -lt 100 ]]; then
+              echo "Hub cluster CA bundle is missing or too small"
+              return 1
+            fi
+            
+            if [[ -z "$primary_ca_bundle" || ${#primary_ca_bundle} -lt 100 ]]; then
+              echo "Primary cluster CA bundle is missing or too small"
+              return 1
+            fi
+            
+            if [[ -z "$secondary_ca_bundle" || ${#secondary_ca_bundle} -lt 100 ]]; then
+              echo "Secondary cluster CA bundle is missing or too small"
+              return 1
+            fi
+            
+            # Check if all CA bundles contain certificates from all three clusters
+            # Look for hub cluster certificates
+            if [[ "$hub_ca_bundle" != *"# CA from hub-ca"* ]]; then
+              echo "Hub cluster CA bundle missing hub-ca certificate"
+              return 1
+            fi
+            
+            if [[ "$primary_ca_bundle" != *"# CA from hub-ca"* ]]; then
+              echo "Primary cluster CA bundle missing hub-ca certificate"
+              return 1
+            fi
+            
+            if [[ "$secondary_ca_bundle" != *"# CA from hub-ca"* ]]; then
+              echo "Secondary cluster CA bundle missing hub-ca certificate"
+              return 1
+            fi
+            
+            # Look for primary cluster certificates
+            if [[ "$hub_ca_bundle" != *"# CA from ocp-primary-ca"* ]]; then
+              echo "Hub cluster CA bundle missing ocp-primary-ca certificate"
+              return 1
+            fi
+            
+            if [[ "$primary_ca_bundle" != *"# CA from ocp-primary-ca"* ]]; then
+              echo "Primary cluster CA bundle missing ocp-primary-ca certificate"
+              return 1
+            fi
+            
+            if [[ "$secondary_ca_bundle" != *"# CA from ocp-primary-ca"* ]]; then
+              echo "Secondary cluster CA bundle missing ocp-primary-ca certificate"
+              return 1
+            fi
+            
+            # Look for secondary cluster certificates
+            if [[ "$hub_ca_bundle" != *"# CA from ocp-secondary-ca"* ]]; then
+              echo "Hub cluster CA bundle missing ocp-secondary-ca certificate"
+              return 1
+            fi
+            
+            if [[ "$primary_ca_bundle" != *"# CA from ocp-secondary-ca"* ]]; then
+              echo "Primary cluster CA bundle missing ocp-secondary-ca certificate"
+              return 1
+            fi
+            
+            if [[ "$secondary_ca_bundle" != *"# CA from ocp-secondary-ca"* ]]; then
+              echo "Secondary cluster CA bundle missing ocp-secondary-ca certificate"
+              return 1
+            fi
+            
+            # Check that all CA bundles are identical (they should contain the same combined certificate data)
+            if [[ "$hub_ca_bundle" != "$primary_ca_bundle" ]]; then
+              echo "Hub and Primary cluster CA bundles are not identical"
+              return 1
+            fi
+            
+            if [[ "$hub_ca_bundle" != "$secondary_ca_bundle" ]]; then
+              echo "Hub and Secondary cluster CA bundles are not identical"
+              return 1
+            fi
+            
+            echo "✅ CA material is complete and consistent across all clusters"
+            return 0
+          }
+          
           # Function to download kubeconfig for a cluster
           download_kubeconfig() {
             local cluster="$1"
@@ -168,6 +324,11 @@ spec:
             all_checks_passed=true
             
             # Download kubeconfigs
+            if ! download_kubeconfig "$HUB_CLUSTER"; then
+              echo "Failed to download kubeconfig for $HUB_CLUSTER"
+              all_checks_passed=false
+            fi
+            
             if ! download_kubeconfig "$PRIMARY_CLUSTER"; then
               echo "Failed to download kubeconfig for $PRIMARY_CLUSTER"
               all_checks_passed=false
@@ -179,12 +340,17 @@ spec:
             fi
             
             if [[ "$all_checks_passed" == "true" ]]; then
-              # Check Submariner health
+              # Check Submariner health on individual clusters
               if ! check_submariner_health "$PRIMARY_CLUSTER" "$KUBECONFIG_DIR/${PRIMARY_CLUSTER}-kubeconfig.yaml"; then
                 all_checks_passed=false
               fi
               
               if ! check_submariner_health "$SECONDARY_CLUSTER" "$KUBECONFIG_DIR/${SECONDARY_CLUSTER}-kubeconfig.yaml"; then
+                all_checks_passed=false
+              fi
+              
+              # Check Submariner connectivity between clusters
+              if ! check_submariner_connectivity "$KUBECONFIG_DIR/${PRIMARY_CLUSTER}-kubeconfig.yaml" "$KUBECONFIG_DIR/${SECONDARY_CLUSTER}-kubeconfig.yaml"; then
                 all_checks_passed=false
               fi
               
@@ -197,12 +363,21 @@ spec:
                 all_checks_passed=false
               fi
               
-              # Check CA configuration
+              # Check CA configuration on individual clusters
+              if ! check_ca_configuration "$HUB_CLUSTER" "$KUBECONFIG_DIR/${HUB_CLUSTER}-kubeconfig.yaml"; then
+                all_checks_passed=false
+              fi
+              
               if ! check_ca_configuration "$PRIMARY_CLUSTER" "$KUBECONFIG_DIR/${PRIMARY_CLUSTER}-kubeconfig.yaml"; then
                 all_checks_passed=false
               fi
               
               if ! check_ca_configuration "$SECONDARY_CLUSTER" "$KUBECONFIG_DIR/${SECONDARY_CLUSTER}-kubeconfig.yaml"; then
+                all_checks_passed=false
+              fi
+              
+              # Check CA material completeness across all clusters
+              if ! check_ca_material_completeness "$KUBECONFIG_DIR/${HUB_CLUSTER}-kubeconfig.yaml" "$KUBECONFIG_DIR/${PRIMARY_CLUSTER}-kubeconfig.yaml" "$KUBECONFIG_DIR/${SECONDARY_CLUSTER}-kubeconfig.yaml"; then
                 all_checks_passed=false
               fi
             fi
@@ -219,8 +394,9 @@ spec:
           
           echo "❌ Prerequisites check failed after $MAX_ATTEMPTS attempts"
           echo "Please ensure:"
-          echo "1. Submariner is installed and connected on both clusters"
-          echo "2. ODF is installed and healthy on both clusters"
-          echo "3. CA certificates are properly configured on both clusters"
+          echo "1. Submariner is installed and connected between ocp-primary and ocp-secondary"
+          echo "2. ODF is installed and healthy on both managed clusters"
+          echo "3. CA certificates are properly configured on all three clusters (hub, primary, secondary)"
+          echo "4. All clusters have identical CA bundles containing certificates from all three clusters"
           exit 1
       serviceAccountName: odf-dr-prerequisites-checker

@@ -25,7 +25,7 @@ rules:
   resources: ["proxies"]
   verbs: ["get", "list"]
 - apiGroups: ["submariner.io"]
-  resources: ["submariners"]
+  resources: ["submariners", "clusters"]
   verbs: ["get", "list"]
 - apiGroups: ["ocs.openshift.io"]
   resources: ["storageclusters"]
