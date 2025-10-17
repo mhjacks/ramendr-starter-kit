@@ -431,9 +431,19 @@ spec:
               echo "⏳ Waiting for clusters to be ready: ${unavailable_clusters[*]}"
               echo "Clusters must be available and joined before health checks can begin"
               echo "This is normal during initial cluster deployment - clusters may take several minutes to become ready"
-              sleep $SLEEP_INTERVAL
-              ((attempt++))
-              continue
+              
+              # If this is the last attempt and clusters are still not ready, fail
+              if [[ $attempt -ge $MAX_ATTEMPTS ]]; then
+                echo "❌ FINAL ATTEMPT FAILED: Clusters are still not ready after $MAX_ATTEMPTS attempts"
+                echo "This indicates a problem with cluster deployment or connectivity"
+                echo "Failed clusters: ${unavailable_clusters[*]}"
+                echo "The health monitor cannot function without ready clusters"
+                exit 1
+              else
+                sleep $SLEEP_INTERVAL
+                ((attempt++))
+                continue
+              fi
             fi
             
             echo "✅ All managed clusters are available and ready - proceeding with health checks"
