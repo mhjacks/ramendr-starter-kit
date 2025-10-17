@@ -39,6 +39,154 @@ spec:
           MAX_ATTEMPTS=3
           SLEEP_INTERVAL=10
           
+          # Function to clean up placeholder ConfigMaps
+          cleanup_placeholder_configmaps() {
+            echo "🧹 Cleaning up placeholder ConfigMaps from managed clusters..."
+            
+            # Get list of managed clusters
+            MANAGED_CLUSTERS=$(oc get managedclusters -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || echo "")
+            
+            if [[ -z "$MANAGED_CLUSTERS" ]]; then
+              echo "No managed clusters found"
+              return 1
+            fi
+            
+            for cluster in $MANAGED_CLUSTERS; do
+              if [[ "$cluster" == "local-cluster" ]]; then
+                continue
+              fi
+              
+              echo "Checking $cluster for placeholder ConfigMaps..."
+              
+              # Get kubeconfig for the cluster
+              KUBECONFIG_FILE=""
+              if oc get secret -n "$cluster" -o name | grep -E "(admin-kubeconfig|kubeconfig)" | head -1 | xargs -I {} oc get {} -n "$cluster" -o jsonpath='{.data.kubeconfig}' | base64 -d > "/tmp/${cluster}-kubeconfig.yaml" 2>/dev/null; then
+                KUBECONFIG_FILE="/tmp/${cluster}-kubeconfig.yaml"
+              fi
+              
+              if [[ -n "$KUBECONFIG_FILE" && -f "$KUBECONFIG_FILE" ]]; then
+                # Check if ConfigMap contains placeholder content
+                local configmap_content=$(oc --kubeconfig="$KUBECONFIG_FILE" get configmap cluster-proxy-ca-bundle -n openshift-config -o jsonpath='{.data.ca-bundle\.crt}' 2>/dev/null || echo "")
+                
+                if [[ "$configmap_content" == *"Placeholder for ODF SSL certificate bundle"* ]] || [[ "$configmap_content" == *"This will be populated by the certificate extraction job"* ]]; then
+                  echo "  🗑️  Deleting placeholder ConfigMap from $cluster..."
+                  oc --kubeconfig="$KUBECONFIG_FILE" delete configmap cluster-proxy-ca-bundle -n openshift-config --ignore-not-found=true
+                  echo "  ✅ Placeholder ConfigMap removed from $cluster"
+                else
+                  echo "  ✅ $cluster: No placeholder ConfigMap found"
+                fi
+              else
+                echo "  ❌ $cluster: Could not get kubeconfig for cleanup"
+              fi
+            done
+            
+            echo "✅ Placeholder ConfigMap cleanup completed"
+            return 0
+          }
+          
+          # Function to remediate missing or incomplete ConfigMaps
+          remediate_configmap_distribution() {
+            echo "🔧 Remediating ConfigMap distribution to managed clusters..."
+            
+            # Get list of managed clusters
+            MANAGED_CLUSTERS=$(oc get managedclusters -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || echo "")
+            
+            if [[ -z "$MANAGED_CLUSTERS" ]]; then
+              echo "No managed clusters found"
+              return 1
+            fi
+            
+            echo "Found managed clusters: $MANAGED_CLUSTERS"
+            
+            remediation_needed=false
+            for cluster in $MANAGED_CLUSTERS; do
+              if [[ "$cluster" == "local-cluster" ]]; then
+                continue
+              fi
+              
+              echo "Checking $cluster for ConfigMap remediation..."
+              
+              # Get kubeconfig for the cluster
+              KUBECONFIG_FILE=""
+              if oc get secret -n "$cluster" -o name | grep -E "(admin-kubeconfig|kubeconfig)" | head -1 | xargs -I {} oc get {} -n "$cluster" -o jsonpath='{.data.kubeconfig}' | base64 -d > "/tmp/${cluster}-kubeconfig.yaml" 2>/dev/null; then
+                KUBECONFIG_FILE="/tmp/${cluster}-kubeconfig.yaml"
+              fi
+              
+              if [[ -n "$KUBECONFIG_FILE" && -f "$KUBECONFIG_FILE" ]]; then
+                # Check if ConfigMap exists and is valid
+                local configmap_exists=$(oc --kubeconfig="$KUBECONFIG_FILE" get configmap cluster-proxy-ca-bundle -n openshift-config &>/dev/null && echo "true" || echo "false")
+                local configmap_size=$(oc --kubeconfig="$KUBECONFIG_FILE" get configmap cluster-proxy-ca-bundle -n openshift-config -o jsonpath='{.data.ca-bundle\.crt}' 2>/dev/null | wc -c || echo "0")
+                local proxy_configured=$(oc --kubeconfig="$KUBECONFIG_FILE" get proxy cluster -o jsonpath='{.spec.trustedCA.name}' 2>/dev/null || echo "")
+                local configmap_content=$(oc --kubeconfig="$KUBECONFIG_FILE" get configmap cluster-proxy-ca-bundle -n openshift-config -o jsonpath='{.data.ca-bundle\.crt}' 2>/dev/null || echo "")
+                
+                # Check if ConfigMap contains placeholder content
+                local is_placeholder=false
+                if [[ "$configmap_content" == *"Placeholder for ODF SSL certificate bundle"* ]] || [[ "$configmap_content" == *"This will be populated by the certificate extraction job"* ]]; then
+                  is_placeholder=true
+                  echo "  🔍 $cluster: ConfigMap contains placeholder content"
+                fi
+                
+                if [[ "$configmap_exists" == "true" && $configmap_size -gt 100 && "$proxy_configured" == "cluster-proxy-ca-bundle" && "$is_placeholder" == "false" ]]; then
+                  echo "  ✅ $cluster: ConfigMap is healthy (${configmap_size} bytes)"
+                else
+                  echo "  ❌ $cluster: ConfigMap needs remediation"
+                  echo "    ConfigMap exists: $configmap_exists"
+                  echo "    ConfigMap size: $configmap_size bytes"
+                  echo "    Proxy configured: $proxy_configured"
+                  if [[ "$is_placeholder" == "true" ]]; then
+                    echo "    ⚠️  Contains placeholder content - needs real certificate data"
+                  fi
+                  
+                  # Get the hub cluster's CA bundle to distribute
+                  local hub_ca_bundle=$(oc get configmap cluster-proxy-ca-bundle -n openshift-config -o jsonpath='{.data.ca-bundle\.crt}' 2>/dev/null || echo "")
+                  
+                  if [[ -n "$hub_ca_bundle" && ${#hub_ca_bundle} -gt 100 ]]; then
+                    echo "  🔧 Remediating $cluster with hub CA bundle..."
+                    
+                    # If ConfigMap contains placeholders, delete it first to ensure clean replacement
+                    if [[ "$is_placeholder" == "true" ]]; then
+                      echo "  🗑️  Deleting placeholder ConfigMap from $cluster..."
+                      oc --kubeconfig="$KUBECONFIG_FILE" delete configmap cluster-proxy-ca-bundle -n openshift-config --ignore-not-found=true
+                      sleep 2
+                    fi
+                    
+                    # Create/update ConfigMap on managed cluster
+                    if oc --kubeconfig="$KUBECONFIG_FILE" create configmap cluster-proxy-ca-bundle \
+                      --from-literal=ca-bundle.crt="$hub_ca_bundle" \
+                      -n openshift-config \
+                      --dry-run=client -o yaml | oc --kubeconfig="$KUBECONFIG_FILE" apply -f -; then
+                      
+                      # Update proxy configuration
+                      if oc --kubeconfig="$KUBECONFIG_FILE" patch proxy/cluster --type=merge --patch='{"spec":{"trustedCA":{"name":"cluster-proxy-ca-bundle"}}}'; then
+                        echo "  ✅ $cluster: ConfigMap remediated successfully"
+                      else
+                        echo "  ⚠️  $cluster: ConfigMap created but proxy update failed"
+                        remediation_needed=true
+                      fi
+                    else
+                      echo "  ❌ $cluster: Failed to create ConfigMap"
+                      remediation_needed=true
+                    fi
+                  else
+                    echo "  ❌ $cluster: Hub CA bundle not available for remediation"
+                    remediation_needed=true
+                  fi
+                fi
+              else
+                echo "  ❌ $cluster: Could not get kubeconfig for remediation"
+                remediation_needed=true
+              fi
+            done
+            
+            if [[ "$remediation_needed" == "true" ]]; then
+              echo "⚠️  Some clusters could not be remediated automatically"
+              return 1
+            else
+              echo "✅ All clusters remediated successfully"
+              return 0
+            fi
+          }
+          
           # Function to check if certificate extraction is needed
           check_certificate_distribution() {
             echo "Checking certificate distribution status..."
@@ -375,6 +523,34 @@ spec:
               exit 0
             else
               echo "❌ Certificate distribution is incomplete or missing"
+              
+              # First clean up any placeholder ConfigMaps
+              echo "🧹 Cleaning up placeholder ConfigMaps..."
+              cleanup_placeholder_configmaps
+              
+              # Then try remediation for missing ConfigMaps
+              echo "🔧 Attempting ConfigMap remediation before extraction..."
+              if remediate_configmap_distribution; then
+                echo "✅ ConfigMap remediation successful"
+                echo "   Re-verifying distribution after remediation..."
+                
+                # Wait a moment for remediation to propagate
+                sleep 10
+                
+                if check_certificate_distribution; then
+                  echo "✅ Certificate distribution verified after remediation"
+                  echo "🎯 ODF SSL certificate precheck completed successfully"
+                  echo "   Ready for DR prerequisites check"
+                  exit 0
+                else
+                  echo "⚠️  Remediation completed but distribution still incomplete"
+                  echo "   Proceeding with certificate extraction..."
+                fi
+              else
+                echo "⚠️  ConfigMap remediation failed or incomplete"
+                echo "   Proceeding with certificate extraction..."
+              fi
+              
               echo "   Triggering certificate extraction (attempt $attempt/$MAX_ATTEMPTS)..."
               
               if trigger_certificate_extraction; then

@@ -358,6 +358,48 @@ spec:
             fi
           done
           
+          # Verify distribution to managed clusters
+          echo "8. Verifying certificate distribution to managed clusters..."
+          verification_failed=false
+          for cluster in $MANAGED_CLUSTERS; do
+            if [[ "$cluster" == "local-cluster" ]]; then
+              continue
+            fi
+            
+            echo "  Verifying distribution to $cluster..."
+            KUBECONFIG_FILE="$WORK_DIR/${cluster}-kubeconfig.yaml"
+            
+            if [[ -f "$KUBECONFIG_FILE" ]]; then
+              # Check if ConfigMap exists and has content
+              local configmap_exists=$(oc --kubeconfig="$KUBECONFIG_FILE" get configmap cluster-proxy-ca-bundle -n openshift-config &>/dev/null && echo "true" || echo "false")
+              local configmap_size=$(oc --kubeconfig="$KUBECONFIG_FILE" get configmap cluster-proxy-ca-bundle -n openshift-config -o jsonpath='{.data.ca-bundle\.crt}' 2>/dev/null | wc -c || echo "0")
+              local proxy_configured=$(oc --kubeconfig="$KUBECONFIG_FILE" get proxy cluster -o jsonpath='{.spec.trustedCA.name}' 2>/dev/null || echo "")
+              
+              if [[ "$configmap_exists" == "true" && $configmap_size -gt 100 && "$proxy_configured" == "cluster-proxy-ca-bundle" ]]; then
+                echo "    ✅ $cluster: ConfigMap exists (${configmap_size} bytes), proxy configured"
+              else
+                echo "    ❌ $cluster: ConfigMap verification failed"
+                echo "      ConfigMap exists: $configmap_exists"
+                echo "      ConfigMap size: $configmap_size bytes"
+                echo "      Proxy configured: $proxy_configured"
+                verification_failed=true
+              fi
+            else
+              echo "    ❌ $cluster: No kubeconfig available for verification"
+              verification_failed=true
+            fi
+          done
+          
+          if [[ "$verification_failed" == "true" ]]; then
+            echo ""
+            echo "⚠️  Certificate distribution verification failed for some clusters"
+            echo "   This may cause DR prerequisites check to fail"
+            echo "   Manual intervention may be required"
+          else
+            echo ""
+            echo "✅ All managed clusters verified successfully"
+          fi
+          
           echo ""
           echo "✅ ODF SSL certificate management completed successfully!"
           echo "   - Hub cluster CA bundle: Updated (includes trusted CA + ingress CA)"
