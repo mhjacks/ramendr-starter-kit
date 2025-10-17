@@ -475,7 +475,7 @@ spec:
                     echo ""
                     echo "This follows Red Hat ODF Disaster Recovery certificate management guidelines"
                     echo "for secure SSL access across clusters in the regional DR setup."
-          EOF
+EOF
             
             echo "Certificate extraction job created"
             
@@ -500,7 +500,8 @@ spec:
           }
           
           # Main execution with retry logic
-          echo "🔍 Starting certificate distribution check with retry logic..."
+          main_execution() {
+            echo "🔍 Starting certificate distribution check with retry logic..."
           
           attempt=1
           while [[ $attempt -le $MAX_ATTEMPTS ]]; do
@@ -578,3 +579,7 @@ spec:
           echo "   This may affect DR prerequisites check"
           echo "   Manual intervention may be required"
           exit 1
+          }
+          
+          # Call main execution
+          main_execution
