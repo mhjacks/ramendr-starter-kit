@@ -360,26 +360,54 @@ spec:
             return 1
           }
           
-          # Main execution
-          echo "🔍 Checking if certificate distribution is needed..."
+          # Main execution with retry logic
+          echo "🔍 Starting certificate distribution check with retry logic..."
           
-          if check_certificate_distribution; then
-            echo "✅ Certificate distribution is already complete"
-            echo "   No action needed - proceeding with DR prerequisites check"
-          else
-            echo "❌ Certificate distribution is incomplete or missing"
-            echo "   Triggering certificate extraction..."
+          attempt=1
+          while [[ $attempt -le $MAX_ATTEMPTS ]]; do
+            echo "=== Certificate Distribution Attempt $attempt/$MAX_ATTEMPTS ==="
             
-            if trigger_certificate_extraction; then
-              echo "✅ Certificate extraction completed successfully"
-              echo "   Certificate distribution is now complete"
+            if check_certificate_distribution; then
+              echo "✅ Certificate distribution is complete and verified"
+              echo "   All clusters have proper CA bundles"
+              echo "🎯 ODF SSL certificate precheck completed successfully"
+              echo "   Ready for DR prerequisites check"
+              exit 0
             else
-              echo "❌ Certificate extraction failed"
-              echo "   This may affect DR prerequisites check"
-              exit 1
+              echo "❌ Certificate distribution is incomplete or missing"
+              echo "   Triggering certificate extraction (attempt $attempt/$MAX_ATTEMPTS)..."
+              
+              if trigger_certificate_extraction; then
+                echo "✅ Certificate extraction completed successfully"
+                echo "   Re-verifying distribution..."
+                
+                # Wait a moment for distribution to propagate
+                sleep 10
+                
+                if check_certificate_distribution; then
+                  echo "✅ Certificate distribution verified after extraction"
+                  echo "🎯 ODF SSL certificate precheck completed successfully"
+                  echo "   Ready for DR prerequisites check"
+                  exit 0
+                else
+                  echo "⚠️  Certificate extraction completed but distribution still incomplete"
+                  echo "   Will retry in $SLEEP_INTERVAL seconds..."
+                fi
+              else
+                echo "❌ Certificate extraction failed (attempt $attempt/$MAX_ATTEMPTS)"
+                echo "   Will retry in $SLEEP_INTERVAL seconds..."
+              fi
             fi
-          fi
+            
+            if [[ $attempt -lt $MAX_ATTEMPTS ]]; then
+              echo "⏳ Waiting $SLEEP_INTERVAL seconds before next attempt..."
+              sleep $SLEEP_INTERVAL
+            fi
+            
+            ((attempt++))
+          done
           
-          echo ""
-          echo "🎯 ODF SSL certificate precheck completed"
-          echo "   Ready for DR prerequisites check"
+          echo "❌ Certificate distribution failed after $MAX_ATTEMPTS attempts"
+          echo "   This may affect DR prerequisites check"
+          echo "   Manual intervention may be required"
+          exit 1

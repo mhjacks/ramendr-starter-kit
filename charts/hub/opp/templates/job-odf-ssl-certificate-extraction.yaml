@@ -301,8 +301,11 @@ spec:
             echo "  Warning: Could not update hub cluster proxy"
           }
           
-          # Distribute certificate data to managed clusters
+          # Distribute certificate data to managed clusters with retry logic
           echo "7. Distributing certificate data to managed clusters..."
+          DISTRIBUTION_ATTEMPTS=3
+          DISTRIBUTION_SLEEP=10
+          
           for cluster in $MANAGED_CLUSTERS; do
             if [[ "$cluster" == "local-cluster" ]]; then
               continue
@@ -317,20 +320,41 @@ spec:
             fi
             
             if [[ -n "$KUBECONFIG_FILE" && -f "$KUBECONFIG_FILE" ]]; then
-              # Create ConfigMap on managed cluster
-              oc --kubeconfig="$KUBECONFIG_FILE" create configmap cluster-proxy-ca-bundle \
-                --from-file=ca-bundle.crt="$WORK_DIR/combined-ca-bundle.crt" \
-                -n openshift-config \
-                --dry-run=client -o yaml | oc --kubeconfig="$KUBECONFIG_FILE" apply -f -
+              # Retry distribution to managed cluster
+              distribution_success=false
+              for dist_attempt in $(seq 1 $DISTRIBUTION_ATTEMPTS); do
+                echo "    Distribution attempt $dist_attempt/$DISTRIBUTION_ATTEMPTS for $cluster..."
+                
+                # Create ConfigMap on managed cluster
+                if oc --kubeconfig="$KUBECONFIG_FILE" create configmap cluster-proxy-ca-bundle \
+                  --from-file=ca-bundle.crt="$WORK_DIR/combined-ca-bundle.crt" \
+                  -n openshift-config \
+                  --dry-run=client -o yaml | oc --kubeconfig="$KUBECONFIG_FILE" apply -f -; then
+                  
+                  # Update managed cluster proxy
+                  if oc --kubeconfig="$KUBECONFIG_FILE" patch proxy/cluster --type=merge --patch='{"spec":{"trustedCA":{"name":"cluster-proxy-ca-bundle"}}}'; then
+                    echo "    ✅ Certificate data distributed to $cluster (attempt $dist_attempt)"
+                    distribution_success=true
+                    break
+                  else
+                    echo "    ⚠️  ConfigMap created but proxy update failed for $cluster (attempt $dist_attempt)"
+                  fi
+                else
+                  echo "    ⚠️  ConfigMap creation failed for $cluster (attempt $dist_attempt)"
+                fi
+                
+                if [[ $dist_attempt -lt $DISTRIBUTION_ATTEMPTS ]]; then
+                  echo "    ⏳ Waiting $DISTRIBUTION_SLEEP seconds before retry..."
+                  sleep $DISTRIBUTION_SLEEP
+                fi
+              done
               
-              # Update managed cluster proxy
-              oc --kubeconfig="$KUBECONFIG_FILE" patch proxy/cluster --type=merge --patch='{"spec":{"trustedCA":{"name":"cluster-proxy-ca-bundle"}}}' || {
-                echo "    Warning: Could not update $cluster proxy"
-              }
-              
-              echo "    Certificate data distributed to $cluster"
+              if [[ "$distribution_success" != "true" ]]; then
+                echo "    ❌ Failed to distribute certificate data to $cluster after $DISTRIBUTION_ATTEMPTS attempts"
+                echo "    This may cause DR prerequisites check to fail"
+              fi
             else
-              echo "    Warning: Could not get kubeconfig for $cluster"
+              echo "    ❌ Could not get kubeconfig for $cluster - skipping distribution"
             fi
           done
           
