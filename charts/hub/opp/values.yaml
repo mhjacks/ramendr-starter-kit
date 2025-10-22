@@ -4,5 +4,5 @@
 ##  secretKey: '{{ `{{ fromSecret "openshift-storage" "noobaa-admin" "AWS_SECRET_ACCESS_KEY" }}` }}'
 
 argocdHealthMonitor:
-  enabled: false
+  enabled: true
 
