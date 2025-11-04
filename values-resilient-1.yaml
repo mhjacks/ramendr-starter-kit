@@ -9,7 +9,9 @@ clusterGroup:
     - openshift-storage
     - policies
     - gitops-vms
-    - openshift-adp
+    - openshift-adp:
+        operatorGroup: true
+        targetNamespaces:
     - openshift-workload-availability:
         operatorGroup: true
         targetNamespaces:
