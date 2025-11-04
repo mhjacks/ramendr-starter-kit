@@ -9,6 +9,7 @@ clusterGroup:
     - openshift-storage
     - policies
     - gitops-vms
+    - openshift-adp
     - openshift-workload-availability:
         operatorGroup: true
         targetNamespaces:
@@ -32,6 +33,11 @@ clusterGroup:
     openshift-data-foundation:
       name: odf-operator
       namespace: openshift-storage
+
+    openshift-oadp:
+      name: oadp-operator
+      namespace: openshift-adp
+      channel: stable-1.4
 
   projects:
     - resilient
