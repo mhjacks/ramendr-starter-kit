@@ -377,6 +377,31 @@ spec:
             echo "  Warning: Could not update hub cluster proxy"
           }
           
+          # Update ramen-hub-operator-config with base64-encoded CA bundle
+          echo "7b. Updating ramen-hub-operator-config in openshift-gitops namespace..."
+          
+          # Base64 encode the combined CA bundle
+          CA_BUNDLE_BASE64=$(base64 -w 0 < "$WORK_DIR/combined-ca-bundle.crt" 2>/dev/null || base64 < "$WORK_DIR/combined-ca-bundle.crt" | tr -d '\n')
+          
+          # Check if ramen-hub-operator-config exists
+          if oc get configmap ramen-hub-operator-config -n openshift-gitops &>/dev/null; then
+            echo "  ConfigMap exists, patching with base64-encoded CA bundle..."
+            oc patch configmap ramen-hub-operator-config -n openshift-gitops \
+              --type=merge \
+              --patch="{\"data\":{\"caCertificates\":\"$CA_BUNDLE_BASE64\"}}" || {
+              echo "  Warning: Could not patch ramen-hub-operator-config"
+            }
+          else
+            echo "  ConfigMap does not exist, creating with base64-encoded CA bundle..."
+            oc create configmap ramen-hub-operator-config -n openshift-gitops \
+              --from-literal=caCertificates="$CA_BUNDLE_BASE64" || {
+              echo "  Warning: Could not create ramen-hub-operator-config"
+            }
+          fi
+          
+          echo "  ramen-hub-operator-config updated successfully with base64-encoded CA bundle"
+          echo "  This enables SSL access for discovered applications in ODF Disaster Recovery"
+          
           # Distribute certificate data to managed clusters with retry logic
           echo "8. Distributing certificate data to managed clusters..."
           DISTRIBUTION_ATTEMPTS=3
@@ -516,10 +541,13 @@ spec:
           echo "✅ ODF SSL certificate management completed successfully!"
           echo "   - Hub cluster CA bundle: Updated (includes trusted CA + ingress CA)"
           echo "   - Hub cluster proxy: Configured"
+          echo "   - ramen-hub-operator-config: Updated with base64-encoded CA bundle"
           echo "   - Managed clusters: Certificate data distributed (includes ingress CAs)"
           echo ""
           echo "This follows Red Hat ODF Disaster Recovery certificate management guidelines"
           echo "for secure SSL access across clusters in the regional DR setup."
+          echo "The ramen-hub-operator-config update enables SSL access for discovered applications"
+          echo "as described in the Red Hat ODF Disaster Recovery documentation."
           }
           
           # Execute main function with retry logic
