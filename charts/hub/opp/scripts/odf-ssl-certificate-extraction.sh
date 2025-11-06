@@ -455,63 +455,89 @@ if oc get configmap ramen-hub-operator-config -n openshift-operators &>/dev/null
     # Create a temporary YAML file with the update
     echo "$EXISTING_YAML" > "$WORK_DIR/existing-ramen-config.yaml"
     
-    # Use yq to update caCertificates in each s3StoreProfiles item
-    if command -v yq &>/dev/null; then
-      # Update caCertificates for each item in s3StoreProfiles array
-      yq eval ".s3StoreProfiles[]?.caCertificates = \"$CA_BUNDLE_BASE64\"" -i "$WORK_DIR/existing-ramen-config.yaml" 2>/dev/null || {
-        echo "  Warning: Could not update s3StoreProfiles with yq, trying alternative approach..."
-        # Fallback: manually add caCertificates to each profile
-        python3 -c "
+    echo "  Existing YAML content (first 20 lines):"
+    echo "$EXISTING_YAML" | head -n 20
+    
+    # Use Python to update caCertificates in each s3StoreProfiles item
+    # Write Python script to file to avoid quoting issues
+    cat > "$WORK_DIR/update_ramen_config.py" <<PYTHON_SCRIPT
 import yaml
 import sys
+import os
 
-with open('$WORK_DIR/existing-ramen-config.yaml', 'r') as f:
-    config = yaml.safe_load(f) or {}
+ca_bundle = os.environ.get('CA_BUNDLE_BASE64', '')
 
-if 's3StoreProfiles' not in config:
-    config['s3StoreProfiles'] = []
-
-for profile in config.get('s3StoreProfiles', []):
-    profile['caCertificates'] = '$CA_BUNDLE_BASE64'
-
-with open('$WORK_DIR/existing-ramen-config.yaml', 'w') as f:
-    yaml.dump(config, f, default_flow_style=False, sort_keys=False)
-" 2>/dev/null || {
-          echo "  Warning: Python/yaml not available, using sed fallback..."
-          # Very basic sed fallback - add caCertificates after each profile name
-          sed -i "/^  - name:/a\    caCertificates: \"$CA_BUNDLE_BASE64\"" "$WORK_DIR/existing-ramen-config.yaml" 2>/dev/null || true
-        }
-      }
+try:
+    with open('$WORK_DIR/existing-ramen-config.yaml', 'r') as f:
+        config = yaml.safe_load(f) or {}
+    
+    if config is None:
+        config = {}
+    
+    # Ensure s3StoreProfiles exists
+    if 's3StoreProfiles' not in config:
+        config['s3StoreProfiles'] = []
+    
+    # Update caCertificates for each profile
+    updated_count = 0
+    for profile in config.get('s3StoreProfiles', []):
+        if isinstance(profile, dict):
+            profile['caCertificates'] = ca_bundle
+            updated_count += 1
+    
+    print(f"  Updated {updated_count} s3StoreProfiles with caCertificates", file=sys.stderr)
+    
+    # Write updated config
+    with open('$WORK_DIR/existing-ramen-config.yaml', 'w') as f:
+        yaml.dump(config, f, default_flow_style=False, sort_keys=False, allow_unicode=True)
+    
+    print("SUCCESS", file=sys.stderr)
+except Exception as e:
+    print(f"ERROR: {e}", file=sys.stderr)
+    sys.exit(1)
+PYTHON_SCRIPT
+    
+    # Run Python script with CA_BUNDLE_BASE64 as environment variable
+    export CA_BUNDLE_BASE64
+    PYTHON_OUTPUT=$(python3 "$WORK_DIR/update_ramen_config.py" 2>&1)
+    PYTHON_EXIT_CODE=$?
+    
+    if [[ $PYTHON_EXIT_CODE -eq 0 ]]; then
+      echo "$PYTHON_OUTPUT"
+      echo "  ✅ Successfully updated s3StoreProfiles with caCertificates"
     else
-      # Fallback: use Python if available
-      if command -v python3 &>/dev/null; then
-        python3 -c "
-import yaml
-import sys
-
-with open('$WORK_DIR/existing-ramen-config.yaml', 'r') as f:
-    config = yaml.safe_load(f) or {}
-
-if 's3StoreProfiles' not in config:
-    config['s3StoreProfiles'] = []
-
-for profile in config.get('s3StoreProfiles', []):
-    profile['caCertificates'] = '$CA_BUNDLE_BASE64'
-
-with open('$WORK_DIR/existing-ramen-config.yaml', 'w') as f:
-    yaml.dump(config, f, default_flow_style=False, sort_keys=False)
-" 2>/dev/null || {
-          echo "  Warning: Python yaml module not available, using sed fallback..."
-          # Very basic sed fallback
-          sed -i "/^  - name:/a\    caCertificates: \"$CA_BUNDLE_BASE64\"" "$WORK_DIR/existing-ramen-config.yaml" 2>/dev/null || true
+      echo "  ⚠️  Warning: Python script failed:"
+      echo "$PYTHON_OUTPUT"
+      echo "  Trying yq as fallback..."
+      # Fallback to yq if available
+      if command -v yq &>/dev/null; then
+        yq eval ".s3StoreProfiles[]?.caCertificates = \"$CA_BUNDLE_BASE64\"" -i "$WORK_DIR/existing-ramen-config.yaml" 2>&1 || {
+          echo "  ⚠️  Warning: yq also failed"
         }
       else
-        echo "  Error: yq or python3 not available - cannot update s3StoreProfiles"
+        echo "  ❌ Error: Could not update s3StoreProfiles - Python and yq both failed"
         echo "  Manual intervention required"
       fi
     fi
     
-    UPDATED_YAML=$(cat "$WORK_DIR/existing-ramen-config.yaml")
+    # Verify the update
+    if [[ -f "$WORK_DIR/existing-ramen-config.yaml" ]]; then
+      UPDATED_YAML=$(cat "$WORK_DIR/existing-ramen-config.yaml")
+      echo "  Updated YAML content (first 20 lines):"
+      echo "$UPDATED_YAML" | head -n 20
+      
+      # Verify caCertificates was added
+      if echo "$UPDATED_YAML" | grep -q "caCertificates"; then
+        echo "  ✅ Verified: caCertificates found in updated YAML"
+      else
+        echo "  ⚠️  Warning: caCertificates not found in updated YAML"
+      fi
+    else
+      echo "  ❌ Error: Updated YAML file not found"
+      UPDATED_YAML="$EXISTING_YAML"
+    fi
+    
+    rm -f "$WORK_DIR/update_ramen_config.py"
   else
     # No existing YAML, create new one with s3StoreProfiles containing caCertificates
     UPDATED_YAML="s3StoreProfiles:
@@ -522,10 +548,102 @@ with open('$WORK_DIR/existing-ramen-config.yaml', 'w') as f:
   # Save updated YAML to a file for use with oc set data
   echo "$UPDATED_YAML" > "$WORK_DIR/ramen_manager_config.yaml"
   
-  # Update the ConfigMap using oc set data with --from-file (handles multiline content properly)
-  UPDATE_OUTPUT=$(oc set data configmap/ramen-hub-operator-config -n openshift-operators \
-    --from-file=ramen_manager_config.yaml="$WORK_DIR/ramen_manager_config.yaml" 2>&1)
-  UPDATE_EXIT_CODE=$?
+  echo "  Preparing to update ConfigMap with YAML content..."
+  echo "  YAML file size: $(wc -c < "$WORK_DIR/ramen_manager_config.yaml") bytes"
+  echo "  YAML file preview (first 10 lines):"
+  head -n 10 "$WORK_DIR/ramen_manager_config.yaml"
+  
+  # Update the ConfigMap using oc create with --dry-run=client and oc apply
+  # This is more reliable than oc set data for multiline content
+  echo "  Creating ConfigMap manifest with updated data..."
+  oc get configmap ramen-hub-operator-config -n openshift-operators -o yaml > "$WORK_DIR/ramen-configmap-template.yaml" 2>/dev/null
+  
+  if [[ -f "$WORK_DIR/ramen-configmap-template.yaml" ]]; then
+    # Update the data section using yq or python
+    if command -v yq &>/dev/null; then
+      yq eval ".data.\"ramen_manager_config.yaml\" = load(\"$WORK_DIR/ramen_manager_config.yaml\") | .data.\"ramen_manager_config.yaml\" style=\"literal\"" -i "$WORK_DIR/ramen-configmap-template.yaml" 2>/dev/null || {
+        # Fallback: use python to update
+        python3 -c "
+import yaml
+import sys
+
+# Read the ConfigMap
+with open('$WORK_DIR/ramen-configmap-template.yaml', 'r') as f:
+    cm = yaml.safe_load(f)
+
+# Read the updated YAML content
+with open('$WORK_DIR/ramen_manager_config.yaml', 'r') as f:
+    updated_yaml = f.read()
+
+# Update the data section
+if 'data' not in cm:
+    cm['data'] = {}
+
+cm['data']['ramen_manager_config.yaml'] = updated_yaml
+
+# Keep metadata but remove fields that Kubernetes manages (oc apply will update these)
+if 'metadata' in cm:
+    # Remove only the fields that Kubernetes manages and shouldn't be in the apply
+    cm['metadata'].pop('resourceVersion', None)
+    cm['metadata'].pop('managedFields', None)
+
+# Write back
+with open('$WORK_DIR/ramen-configmap-updated.yaml', 'w') as f:
+    yaml.dump(cm, f, default_flow_style=False, sort_keys=False, allow_unicode=True)
+" 2>/dev/null
+      }
+    else
+      # Use python to update
+      python3 -c "
+import yaml
+import sys
+
+# Read the ConfigMap
+with open('$WORK_DIR/ramen-configmap-template.yaml', 'r') as f:
+    cm = yaml.safe_load(f)
+
+# Read the updated YAML content
+with open('$WORK_DIR/ramen_manager_config.yaml', 'r') as f:
+    updated_yaml = f.read()
+
+# Update the data section
+if 'data' not in cm:
+    cm['data'] = {}
+
+cm['data']['ramen_manager_config.yaml'] = updated_yaml
+
+# Keep metadata but remove fields that Kubernetes manages (oc apply will update these)
+if 'metadata' in cm:
+    # Remove only the fields that Kubernetes manages and shouldn't be in the apply
+    cm['metadata'].pop('resourceVersion', None)
+    cm['metadata'].pop('managedFields', None)
+
+# Write back
+with open('$WORK_DIR/ramen-configmap-updated.yaml', 'w') as f:
+    yaml.dump(cm, f, default_flow_style=False, sort_keys=False, allow_unicode=True)
+" 2>/dev/null
+    fi
+    
+    if [[ -f "$WORK_DIR/ramen-configmap-updated.yaml" ]]; then
+      echo "  Applying updated ConfigMap..."
+      UPDATE_OUTPUT=$(oc apply -f "$WORK_DIR/ramen-configmap-updated.yaml" 2>&1)
+      UPDATE_EXIT_CODE=$?
+      rm -f "$WORK_DIR/ramen-configmap-template.yaml" "$WORK_DIR/ramen-configmap-updated.yaml"
+    else
+      echo "  ❌ Error: Could not create updated ConfigMap manifest"
+      UPDATE_EXIT_CODE=1
+      UPDATE_OUTPUT="Failed to create updated ConfigMap manifest"
+    fi
+  else
+    echo "  ⚠️  Could not retrieve ConfigMap template, trying oc set data as fallback..."
+    # Fallback to oc set data
+    UPDATE_OUTPUT=$(oc set data configmap/ramen-hub-operator-config -n openshift-operators \
+      ramen_manager_config.yaml="$(cat "$WORK_DIR/ramen_manager_config.yaml")" 2>&1)
+    UPDATE_EXIT_CODE=$?
+  fi
+  
+  echo "  Update exit code: $UPDATE_EXIT_CODE"
+  echo "  Update output: $UPDATE_OUTPUT"
   
   if [[ $UPDATE_EXIT_CODE -eq 0 ]]; then
     # Verify the update was successful
