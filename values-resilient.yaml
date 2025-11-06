@@ -118,7 +118,7 @@ clusterGroup:
     external-dns-operator:
       name: external-dns-operator
       namespace: external-dns-operator
-      project: hub
+      project: resilient
       chart: external-dns-operator
       chartVersion: 0.1.*
 
