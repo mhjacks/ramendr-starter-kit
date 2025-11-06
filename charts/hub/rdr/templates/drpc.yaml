@@ -1,0 +1,39 @@
+---
+apiVersion: ramendr.openshift.io/v1alpha1
+kind: DRPlacementControl
+metadata:
+  annotations:
+    drplacementcontrol.ramendr.openshift.io/app-namespace: openshift-dr-ops
+    argocd.argoproj.io/sync-wave: "8"
+  labels:
+    cluster.open-cluster-management.io/backup: ramen
+  name: gitops-vm-protection
+  namespace: openshift-dr-ops
+spec:
+  drPolicyRef:
+    apiVersion: ramendr.openshift.io/v1alpha1
+    kind: DRPolicy
+    name: 2m-vm
+  failoverCluster: ocp-primary
+  kubeObjectProtection:
+    captureInterval: 5m0s
+    kubeObjectSelector:
+      matchExpressions:
+      - key: drprotection
+        operator: In
+        values:
+        - "true"
+  placementRef:
+    apiVersion: cluster.open-cluster-management.io/v1beta1
+    kind: Placement
+    name: gitops-vm-protection-placement-1
+    namespace: openshift-dr-ops
+  # preferredCluster: ocp-primary
+  protectedNamespaces:
+  - gitops-vms
+  pvcSelector:
+    matchExpressions:
+    - key: app.kubernetes.io/component
+      operator: In
+      values:
+      - storage

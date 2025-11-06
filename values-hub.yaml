@@ -116,14 +116,6 @@ clusterGroup:
           jsonPointers:
             - /
 
-    #rdrtrigger:
-    #  name: regional-dr-trigger
-    #  namespace: regional-dr-trigger
-    #  project: opp
-    #  path: charts/hub/rdrtrigger
-    #  annotations:
-    #    argocd.argoproj.io/sync-wave: "15"
-
     vault:
       name: vault
       namespace: vault
