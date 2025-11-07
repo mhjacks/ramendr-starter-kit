@@ -148,6 +148,18 @@ else
   helm version
 fi
 
+# Change to /tmp to avoid permission issues with helm cache
+echo "  Changing working directory to /tmp for helm operations..."
+cd /tmp || {
+  echo "  ❌ Error: Failed to change to /tmp directory"
+  exit 1
+}
+
+# Set helm cache and config directories to /tmp to avoid permission issues
+export HELM_CACHE_HOME="/tmp/.helm/cache"
+export HELM_CONFIG_HOME="/tmp/.helm/config"
+mkdir -p "$HELM_CACHE_HOME" "$HELM_CONFIG_HOME" 2>/dev/null || true
+
 # Step 2: Get helm template output
 echo ""
 echo "Step 2: Rendering helm template..."
