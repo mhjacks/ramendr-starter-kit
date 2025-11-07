@@ -230,10 +230,15 @@ if [[ ! -s "$WORK_DIR/resources-to-check.yaml" ]]; then
   ' "$WORK_DIR/helm-output.yaml" > "$WORK_DIR/resources-to-check.yaml" 2>/dev/null || true
 fi
 
-# Count resources
-VM_COUNT=$(grep -c "^kind: VirtualMachine" "$WORK_DIR/resources-to-check.yaml" 2>/dev/null || echo "0")
-SERVICE_COUNT=$(grep -c "^kind: Service" "$WORK_DIR/resources-to-check.yaml" 2>/dev/null || echo "0")
-ROUTE_COUNT=$(grep -c "^kind: Route" "$WORK_DIR/resources-to-check.yaml" 2>/dev/null || echo "0")
+# Count resources (remove any newlines/whitespace)
+VM_COUNT=$(grep -c "^kind: VirtualMachine" "$WORK_DIR/resources-to-check.yaml" 2>/dev/null | tr -d ' \n' || echo "0")
+SERVICE_COUNT=$(grep -c "^kind: Service" "$WORK_DIR/resources-to-check.yaml" 2>/dev/null | tr -d ' \n' || echo "0")
+ROUTE_COUNT=$(grep -c "^kind: Route" "$WORK_DIR/resources-to-check.yaml" 2>/dev/null | tr -d ' \n' || echo "0")
+
+# Ensure counts are numeric (handle empty results)
+VM_COUNT=${VM_COUNT:-0}
+SERVICE_COUNT=${SERVICE_COUNT:-0}
+ROUTE_COUNT=${ROUTE_COUNT:-0}
 
 echo "  Found resources in template:"
 echo "    - VirtualMachines: $VM_COUNT"
@@ -301,7 +306,7 @@ if [[ -s "$WORK_DIR/helm-output.yaml" ]]; then
     fi
     
     # Use gitops-vms namespace if namespace is not specified or is empty
-    local check_namespace="${namespace:-$VM_NAMESPACE}"
+    check_namespace="${namespace:-$VM_NAMESPACE}"
     if [[ "$check_namespace" == "null" ]]; then
       check_namespace="$VM_NAMESPACE"
     fi
@@ -372,7 +377,7 @@ else
       while IFS='|' read -r kind name namespace; do
         if [[ -n "$kind" && -n "$name" ]]; then
           # Use gitops-vms namespace if namespace is not specified or is empty
-          local check_namespace="${namespace:-$VM_NAMESPACE}"
+          check_namespace="${namespace:-$VM_NAMESPACE}"
           if [[ "$check_namespace" == "null" ]]; then
             check_namespace="$VM_NAMESPACE"
           fi
