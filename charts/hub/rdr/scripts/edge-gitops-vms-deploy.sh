@@ -390,13 +390,37 @@ else
   
   # First, render the helm template and save it to /tmp
   TEMPLATE_OUTPUT_FILE="/tmp/edge-gitops-vms-template.yaml"
+  TEMPLATE_STDERR_FILE="$WORK_DIR/helm-template-stderr.log"
   echo "  Rendering helm template to: $TEMPLATE_OUTPUT_FILE"
   
-  if ! helm template edge-gitops-vms "$HELM_CHART_URL" $VALUES_ARG --set namespace="$VM_NAMESPACE" > "$TEMPLATE_OUTPUT_FILE" 2>&1; then
-    echo "  ❌ Error: Failed to render helm template"
-    echo "  Helm template output:"
-    cat "$TEMPLATE_OUTPUT_FILE" 2>/dev/null || echo "  (no output captured)"
+  # Temporarily disable exit on error to capture output even if helm template fails
+  set +e
+  
+  # Capture stdout and stderr separately - stderr might contain errors that shouldn't be in the YAML
+  helm template edge-gitops-vms "$HELM_CHART_URL" $VALUES_ARG --set namespace="$VM_NAMESPACE" > "$TEMPLATE_OUTPUT_FILE" 2>"$TEMPLATE_STDERR_FILE"
+  HELM_TEMPLATE_EXIT_CODE=$?
+  
+  # Re-enable exit on error
+  set -e
+  
+  # Check for errors in stderr
+  HELM_TEMPLATE_STDERR=$(cat "$TEMPLATE_STDERR_FILE" 2>/dev/null || echo "")
+  
+  if [[ $HELM_TEMPLATE_EXIT_CODE -ne 0 ]]; then
+    echo "  ❌ Error: Failed to render helm template (exit code: $HELM_TEMPLATE_EXIT_CODE)"
+    echo "  Helm template stderr:"
+    echo "$HELM_TEMPLATE_STDERR" | sed 's/^/    /'
+    echo ""
+    echo "  Helm template stdout (may contain partial output):"
+    cat "$TEMPLATE_OUTPUT_FILE" 2>/dev/null | head -50 | sed 's/^/    /' || echo "    (no output captured)"
     exit 1
+  fi
+  
+  # Check if stderr contains warnings or errors that might indicate issues
+  if [[ -n "$HELM_TEMPLATE_STDERR" ]]; then
+    echo "  ⚠️  Helm template warnings/errors:"
+    echo "$HELM_TEMPLATE_STDERR" | sed 's/^/    /'
+    echo ""
   fi
   
   # Check if template output is valid
@@ -404,6 +428,33 @@ else
     echo "  ❌ Error: Helm template output is empty"
     exit 1
   fi
+  
+  # Validate YAML syntax before applying
+  echo "  Validating YAML syntax..."
+  if command -v yq &>/dev/null; then
+    # Use yq to validate YAML
+    if ! yq eval '.' "$TEMPLATE_OUTPUT_FILE" >/dev/null 2>&1; then
+      echo "  ❌ Error: Invalid YAML syntax detected in template output"
+      echo "  YAML validation error:"
+      yq eval '.' "$TEMPLATE_OUTPUT_FILE" 2>&1 | head -20 | sed 's/^/    /'
+      echo ""
+      echo "  First 200 lines of template file:"
+      head -200 "$TEMPLATE_OUTPUT_FILE" | sed 's/^/    /'
+      exit 1
+    fi
+  else
+    # Fallback: use python to validate YAML
+    if ! python3 -c "import yaml; yaml.safe_load(open('$TEMPLATE_OUTPUT_FILE'))" 2>/dev/null; then
+      echo "  ❌ Error: Invalid YAML syntax detected in template output"
+      echo "  Attempting to find the problematic line..."
+      python3 -c "import yaml; yaml.safe_load(open('$TEMPLATE_OUTPUT_FILE'))" 2>&1 | head -20 | sed 's/^/    /'
+      echo ""
+      echo "  First 200 lines of template file:"
+      head -200 "$TEMPLATE_OUTPUT_FILE" | sed 's/^/    /'
+      exit 1
+    fi
+  fi
+  echo "  ✅ YAML syntax is valid"
   
   # Report what got rendered
   echo "  ✅ Helm template rendered successfully"
@@ -660,13 +711,31 @@ ${APPLY_STDERR}"
     echo "  - Template file size: $(wc -c < "$TEMPLATE_OUTPUT_FILE" 2>/dev/null || echo "0") bytes"
     echo ""
     echo "  ========================================"
-    echo "  TEMPLATE FILE PREVIEW (first 100 lines)"
+    echo "  TEMPLATE FILE PREVIEW (first 200 lines)"
     echo "  ========================================"
     if [[ -f "$TEMPLATE_OUTPUT_FILE" ]]; then
-      head -100 "$TEMPLATE_OUTPUT_FILE" | sed 's/^/  /'
-      if [[ $(wc -l < "$TEMPLATE_OUTPUT_FILE" 2>/dev/null || echo "0") -gt 100 ]]; then
-        echo "  ... (file truncated, showing first 100 lines)"
+      head -200 "$TEMPLATE_OUTPUT_FILE" | sed 's/^/  /'
+      if [[ $(wc -l < "$TEMPLATE_OUTPUT_FILE" 2>/dev/null || echo "0") -gt 200 ]]; then
+        echo "  ... (file truncated, showing first 200 lines)"
         echo "  Full template saved at: $TEMPLATE_OUTPUT_FILE"
+      fi
+      echo ""
+      echo "  Checking for common YAML issues..."
+      # Check for common YAML problems
+      if grep -q "mapping values are not allowed" "$TEMPLATE_OUTPUT_FILE" 2>/dev/null; then
+        echo "  ⚠️  Found 'mapping values are not allowed' in file (this might be an error message)"
+      fi
+      # Check for unclosed quotes or brackets
+      OPEN_BRACES=$(grep -o '{' "$TEMPLATE_OUTPUT_FILE" 2>/dev/null | wc -l || echo "0")
+      CLOSE_BRACES=$(grep -o '}' "$TEMPLATE_OUTPUT_FILE" 2>/dev/null | wc -l || echo "0")
+      if [[ $OPEN_BRACES -ne $CLOSE_BRACES ]]; then
+        echo "  ⚠️  Mismatched braces: $OPEN_BRACES opening, $CLOSE_BRACES closing"
+      fi
+      # Check for lines with colons that might be problematic
+      PROBLEMATIC_LINES=$(grep -n ".*:.*:.*:" "$TEMPLATE_OUTPUT_FILE" 2>/dev/null | head -10 || echo "")
+      if [[ -n "$PROBLEMATIC_LINES" ]]; then
+        echo "  ⚠️  Lines with multiple colons (might indicate YAML issues):"
+        echo "$PROBLEMATIC_LINES" | sed 's/^/    /'
       fi
     else
       echo "  Template file not found!"
