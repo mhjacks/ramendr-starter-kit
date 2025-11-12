@@ -1,23 +1,23 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: odf-dr-prerequisites-checker
+  name: submariner-prerequisites-checker
   namespace: open-cluster-management
   labels:
-    app.kubernetes.io/name: odf-dr-prerequisites
+    app.kubernetes.io/name: submariner-prerequisites
     app.kubernetes.io/component: health-check
   annotations:
-    argocd.argoproj.io/sync-wave: "5"
+    argocd.argoproj.io/sync-wave: "6"
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: odf-dr-prerequisites-checker
+  name: submariner-prerequisites-checker
   labels:
-    app.kubernetes.io/name: odf-dr-prerequisites
+    app.kubernetes.io/name: submariner-prerequisites
     app.kubernetes.io/component: health-check
   annotations:
-    argocd.argoproj.io/sync-wave: "5"
+    argocd.argoproj.io/sync-wave: "6"
 rules:
 # Permissions for checking managed clusters
 - apiGroups: ["cluster.open-cluster-management.io"]
@@ -26,19 +26,9 @@ rules:
 - apiGroups: ["internal.open-cluster-management.io"]
   resources: ["managedclusterinfos"]
   verbs: ["get", "list"]
-# Permissions for checking ODF health
-- apiGroups: ["ocs.openshift.io"]
-  resources: ["storageclusters"]
-  verbs: ["get", "list"]
-- apiGroups: ["odf.openshift.io"]
-  resources: ["storageclusters"]
-  verbs: ["get", "list"]
-# Permissions for checking CA configuration
-- apiGroups: [""]
-  resources: ["configmaps"]
-  verbs: ["get", "list"]
-- apiGroups: ["config.openshift.io"]
-  resources: ["proxies"]
+# Permissions for checking Submariner connectivity
+- apiGroups: ["submariner.io"]
+  resources: ["submariners", "clusters"]
   verbs: ["get", "list"]
 # Permissions for accessing managed cluster secrets
 - apiGroups: [""]
@@ -51,6 +41,10 @@ rules:
 - apiGroups: ["apps"]
   resources: ["deployments"]
   verbs: ["get", "list"]
+# Permissions for checking nodes
+- apiGroups: [""]
+  resources: ["nodes"]
+  verbs: ["get", "list"]
 # Permissions for checking CRDs
 - apiGroups: ["apiextensions.k8s.io"]
   resources: ["customresourcedefinitions"]
@@ -59,17 +53,18 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: odf-dr-prerequisites-checker
+  name: submariner-prerequisites-checker
   labels:
-    app.kubernetes.io/name: odf-dr-prerequisites
+    app.kubernetes.io/name: submariner-prerequisites
     app.kubernetes.io/component: health-check
   annotations:
-    argocd.argoproj.io/sync-wave: "5"
+    argocd.argoproj.io/sync-wave: "6"
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: odf-dr-prerequisites-checker
+  name: submariner-prerequisites-checker
 subjects:
 - kind: ServiceAccount
-  name: odf-dr-prerequisites-checker
+  name: submariner-prerequisites-checker
   namespace: open-cluster-management
+
