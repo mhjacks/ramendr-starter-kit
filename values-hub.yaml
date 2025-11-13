@@ -109,8 +109,7 @@ clusterGroup:
       annotations:
         argocd.argoproj.io/sync-wave: "10"
       syncPolicy:
-        automated:
-          selfHeal: true
+        automated: {}
         syncOptions:
           - RespectIgnoreDifferences=true
       ignoreDifferences:
