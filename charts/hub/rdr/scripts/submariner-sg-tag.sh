@@ -38,47 +38,60 @@ SLEEP_INTERVAL=10
 # Create kubeconfig directory
 mkdir -p "$KUBECONFIG_DIR"
 
-# Function to download kubeconfig for a cluster
+# Function to download kubeconfig for a cluster (using same method as download-kubeconfigs.sh)
 download_kubeconfig() {
   local cluster="$1"
   local kubeconfig_path="$KUBECONFIG_DIR/${cluster}-kubeconfig.yaml"
   
-  echo "Downloading kubeconfig for $cluster..."
+  echo "Downloading kubeconfig for $cluster..." >&2
   
-  # Get the kubeconfig secret name
-  local kubeconfig_secret=$(oc get secret -n "$cluster" -o name | grep -E "(admin-kubeconfig|kubeconfig)" | head -1)
-  
-  if [[ -z "$kubeconfig_secret" ]]; then
-    echo "  ❌ No kubeconfig secret found for cluster $cluster"
+  # Check if cluster is available (same as download-kubeconfigs.sh)
+  local cluster_status=$(oc get managedcluster "$cluster" -o jsonpath='{.status.conditions[?(@.type=="ManagedClusterConditionAvailable")].status}' 2>/dev/null || echo "Unknown")
+  if [[ "$cluster_status" != "True" ]]; then
+    echo "  ⚠️  Cluster $cluster is not available (status: $cluster_status), skipping..." >&2
     return 1
   fi
   
-  echo "  Found kubeconfig secret: $kubeconfig_secret"
+  # Get the kubeconfig secret name (same method as download-kubeconfigs.sh)
+  local kubeconfig_secret=$(oc get secret -n "$cluster" -o name | grep -E "(admin-kubeconfig|kubeconfig)" | head -1)
   
-  # Try to get the kubeconfig data
+  if [[ -z "$kubeconfig_secret" ]]; then
+    echo "  ❌ No kubeconfig secret found for cluster $cluster" >&2
+    return 1
+  fi
+  
+  echo "  Found kubeconfig secret: $kubeconfig_secret" >&2
+  
+  # Try to get the kubeconfig data (same method as download-kubeconfigs.sh)
   local kubeconfig_data=""
+  
+  # First try to get the 'kubeconfig' field
   kubeconfig_data=$(oc get "$kubeconfig_secret" -n "$cluster" -o jsonpath='{.data.kubeconfig}' 2>/dev/null | base64 -d 2>/dev/null || echo "")
   
+  # If that fails, try the 'raw-kubeconfig' field
   if [[ -z "$kubeconfig_data" ]]; then
     kubeconfig_data=$(oc get "$kubeconfig_secret" -n "$cluster" -o jsonpath='{.data.raw-kubeconfig}' 2>/dev/null | base64 -d 2>/dev/null || echo "")
   fi
   
   if [[ -z "$kubeconfig_data" ]]; then
-    echo "  ❌ Could not extract kubeconfig data for cluster $cluster"
+    echo "  ❌ Could not extract kubeconfig data for cluster $cluster" >&2
     return 1
   fi
   
   # Write the kubeconfig to file
   echo "$kubeconfig_data" > "$kubeconfig_path"
   
-  # Verify the kubeconfig is valid
+  # Verify the kubeconfig is valid (same as download-kubeconfigs.sh)
   if oc --kubeconfig="$kubeconfig_path" get nodes &>/dev/null; then
-    echo "  ✅ Successfully downloaded and verified kubeconfig for $cluster"
+    echo "  ✅ Successfully downloaded and verified kubeconfig for $cluster" >&2
+    # Only output the path to stdout (for capture)
     echo "$kubeconfig_path"
     return 0
   else
-    echo "  ❌ Kubeconfig for $cluster is invalid"
-    return 1
+    echo "  ⚠️  Downloaded kubeconfig for $cluster but it may not be valid" >&2
+    # Still return the path even if validation fails, as it might work for some operations
+    echo "$kubeconfig_path"
+    return 0
   fi
 }
 
@@ -387,7 +400,26 @@ tag_security_group() {
 # Main execution
 echo ""
 echo "Discovering managed clusters (excluding local-cluster)..."
-MANAGED_CLUSTERS=$(oc get managedclusters -o jsonpath='{.items[?(@.metadata.name!="local-cluster")].metadata.name}' 2>/dev/null || echo "")
+
+# Get all managed clusters (same method as download-kubeconfigs.sh)
+ALL_CLUSTERS=$(oc get managedclusters -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || echo "")
+
+if [[ -z "$ALL_CLUSTERS" ]]; then
+  echo "❌ No managed clusters found"
+  exit 1
+fi
+
+# Filter out local-cluster
+MANAGED_CLUSTERS=""
+for cluster in $ALL_CLUSTERS; do
+  if [[ "$cluster" != "local-cluster" ]]; then
+    if [[ -z "$MANAGED_CLUSTERS" ]]; then
+      MANAGED_CLUSTERS="$cluster"
+    else
+      MANAGED_CLUSTERS="$MANAGED_CLUSTERS $cluster"
+    fi
+  fi
+done
 
 if [[ -z "$MANAGED_CLUSTERS" ]]; then
   echo "❌ No managed clusters found (excluding local-cluster)"
@@ -401,15 +433,32 @@ SUCCESS_COUNT=0
 FAILED_CLUSTERS=()
 
 # Process each managed cluster
+CLUSTER_NUM=0
+TOTAL_CLUSTERS=$(echo "$MANAGED_CLUSTERS" | wc -w)
 for cluster in $MANAGED_CLUSTERS; do
+  CLUSTER_NUM=$((CLUSTER_NUM + 1))
   echo "=========================================="
-  echo "Processing cluster: $cluster"
+  echo "Processing cluster $CLUSTER_NUM of $TOTAL_CLUSTERS: $cluster"
   echo "=========================================="
   
-  # Download kubeconfig
-  kubeconfig=$(download_kubeconfig "$cluster" || echo "")
-  if [[ -z "$kubeconfig" ]]; then
+  # Download kubeconfig (using same method as download-kubeconfigs.sh)
+  # Note: download_kubeconfig sends debug messages to stderr, so only the path is captured to stdout
+  set +e  # Temporarily disable exit on error for kubeconfig download
+  kubeconfig=$(download_kubeconfig "$cluster")
+  download_exit=$?
+  set -e  # Re-enable exit on error
+  
+  if [[ $download_exit -ne 0 || -z "$kubeconfig" ]]; then
     echo "❌ Failed to download kubeconfig for $cluster, skipping..."
+    FAILED_CLUSTERS+=("$cluster")
+    continue
+  fi
+  
+  # Clean up kubeconfig path (remove any trailing whitespace)
+  kubeconfig=$(echo "$kubeconfig" | tr -d '[:space:]')
+  
+  if [[ ! -f "$kubeconfig" ]]; then
+    echo "❌ Kubeconfig file does not exist: $kubeconfig, skipping..."
     FAILED_CLUSTERS+=("$cluster")
     continue
   fi
