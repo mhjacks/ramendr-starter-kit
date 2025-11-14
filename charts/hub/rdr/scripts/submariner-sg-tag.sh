@@ -345,25 +345,37 @@ tag_security_group() {
   echo "    Tag Value: $tag_value"
   
   # Check if tag already exists
-  local existing_tag=$(aws ec2 describe-tags \
+  local existing_tag=""
+  local check_error=""
+  existing_tag=$(aws ec2 describe-tags \
     --filters "Name=resource-id,Values=$sg_id" \
               "Name=key,Values=$tag_key" \
     --query 'Tags[0].Value' \
-    --output text 2>/dev/null || echo "")
+    --output text 2>&1)
+  check_error=$?
   
-  if [[ "$existing_tag" == "$tag_value" ]]; then
+  if [[ $check_error -eq 0 && "$existing_tag" == "$tag_value" ]]; then
     echo "  ✅ Tag already exists with correct value: $tag_key=$tag_value"
     return 0
   fi
   
   # Create or update the tag
-  if aws ec2 create-tags \
+  echo "  Creating tag..."
+  local tag_output=""
+  local tag_error=""
+  tag_output=$(aws ec2 create-tags \
     --resources "$sg_id" \
-    --tags "Key=$tag_key,Value=$tag_value" 2>/dev/null; then
+    --tags "Key=$tag_key,Value=$tag_value" 2>&1)
+  tag_error=$?
+  
+  if [[ $tag_error -eq 0 ]]; then
     echo "  ✅ Successfully tagged security group $sg_id with $tag_key=$tag_value"
     return 0
   else
     echo "  ❌ Failed to tag security group $sg_id"
+    echo "  AWS CLI Error Output:"
+    echo "    $tag_output" | sed 's/^/    /'
+    echo "  AWS CLI Exit Code: $tag_error"
     return 1
   fi
 }
