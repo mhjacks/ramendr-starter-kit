@@ -19,6 +19,8 @@ kind: Broker
 metadata:
   name: submariner-broker
   namespace: {{ .name }}-broker
+  labels:
+    cluster.open-cluster-management.io/backup: submariner
   annotations:
     argocd.argoproj.io/sync-wave: "6"
 spec:
