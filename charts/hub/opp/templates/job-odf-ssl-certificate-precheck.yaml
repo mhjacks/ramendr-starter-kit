@@ -10,10 +10,12 @@ metadata:
     argocd.argoproj.io/sync-wave: "2"
     argocd.argoproj.io/sync-options: Prune=false
     argocd.argoproj.io/compare-options: IgnoreExtraneous
+    argocd.argoproj.io/hook: "PostSync"
+    argocd.argoproj.io/hook-delete-policy: "BeforeHookCreation"
 spec:
   backoffLimit: 10
   activeDeadlineSeconds: 7200
-  ttlSecondsAfterFinished: 300
+  ttlSecondsAfterFinished: 86400  # 24 hours - keep job for debugging and ArgoCD visibility
   template:
     spec:
       serviceAccountName: odf-ssl-certificate-precheck
