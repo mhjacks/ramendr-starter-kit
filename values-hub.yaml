@@ -1,11 +1,4 @@
 ---
-# Single source of truth for DR pair cluster names - used by both opp-policy and rdr charts.
-# Set these to match your managed cluster names (e.g. ocp-primary/ocp-secondary or ocp-p/ocp-s).
-# When using custom names, ensure regionalDR in rdr chart (or overrides) uses the same names.
-managedClusters:
-  primaryName: ocp-primary
-  secondaryName: ocp-secondary
-
 clusterGroup:
   name: hub
   isHubCluster: true
@@ -43,6 +36,7 @@ clusterGroup:
   # Explicitly mention the cluster-state based overrides we plan to use for this pattern.
   # We can use self-referential variables because the chart calls the tpl function with these variables defined
   sharedValueFiles:
+    - '/overrides/values-cluster-names.yaml'
     - '/overrides/values-{{ $.Values.global.clusterPlatform }}.yaml'
   # sharedValueFiles is a flexible mechanism that will add the listed valuefiles to every app defined in the
   # applications section. We intend this to supplement and possibly even replace previous "magic" mechanisms, though
