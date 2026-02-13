@@ -7,14 +7,14 @@ regionalDR:
     globalnetEnabled: false # Support for overlapping CIDR
     clusters: # Pair of clusters, make sure to create each in a different region
       primary:
-        name: ocp-primary
+        name: ocp-p
         clusterGroup: resilient
         version: 4.18.7
         install_config:
           apiVersion: v1
           baseDomain: "{{ join \".\" (slice (splitList \".\" $.Values.global.clusterDomain) 1) }}"
           metadata:
-            name: ocp-primary
+            name: ocp-p
           controlPlane:
             name: master
             replicas: 3
@@ -45,14 +45,14 @@ regionalDR:
           sshKey: ""
           pullSecret: ""
       secondary:
-        name: ocp-secondary
+        name: ocp-s
         clusterGroup: resilient
         version: 4.18.7
         install_config:
           apiVersion: v1
           baseDomain: "{{ join \".\" (slice (splitList \".\" $.Values.global.clusterDomain) 1) }}"
           metadata:
-            name: ocp-secondary
+            name: ocp-s
           controlPlane:
             name: master
             replicas: 3
