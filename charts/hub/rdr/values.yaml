@@ -2,6 +2,10 @@
 global:
   clusterDomain: cluster.example.com
 
+# Edge GitOps VMs deployment (script and helm chart)
+edgeGitopsVms:
+  chartVersion: "0.2.10"
+
 regionalDR:
   - name: resilient # Matches with ClusterSet
     globalnetEnabled: false # Support for overlapping CIDR
