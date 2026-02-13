@@ -27,7 +27,7 @@ spec:
     kind: Placement
     name: gitops-vm-protection-placement-1
     namespace: openshift-dr-ops
-  preferredCluster: {{ (index .Values.regionalDR 0).clusters.primary.name }}
+  preferredCluster: {{ index (index .Values "managedClusters" | default dict) "primaryName" | default "ocp-primary" }}
   protectedNamespaces:
   - gitops-vms
   pvcSelector:
