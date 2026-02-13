@@ -60,6 +60,10 @@ spec:
         env:
         - name: KUBECONFIG
           value: ""
+        - name: PRIMARY_CLUSTER
+          value: {{ (index .Values.regionalDR 0).clusters.primary.name | quote }}
+        - name: SECONDARY_CLUSTER
+          value: {{ (index .Values.regionalDR 0).clusters.secondary.name | quote }}
       volumes:
       - name: values
         configMap:

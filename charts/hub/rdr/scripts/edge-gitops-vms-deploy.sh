@@ -120,8 +120,9 @@ get_target_cluster_kubeconfig() {
   fi
 }
 
-# Primary cluster name (from values.yaml via env when run in cluster)
+# Primary/secondary cluster names (from regionalDR via env when run by the rdr chart Job)
 PRIMARY_CLUSTER="${PRIMARY_CLUSTER:-ocp-primary}"
+SECONDARY_CLUSTER="${SECONDARY_CLUSTER:-ocp-secondary}"
 
 # Get target cluster from Placement resource
 TARGET_CLUSTER="$PRIMARY_CLUSTER"  # Default to primary
