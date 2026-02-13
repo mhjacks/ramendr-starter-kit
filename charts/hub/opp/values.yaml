@@ -3,6 +3,12 @@
 ##  accessKey: '{{ `{{ fromSecret "openshift-storage" "noobaa-admin" "AWS_ACCESS_KEY_ID" }}` }}'
 ##  secretKey: '{{ `{{ fromSecret "openshift-storage" "noobaa-admin" "AWS_SECRET_ACCESS_KEY" }}` }}'
 
+# Managed cluster names for the DR pair (used by SSL extraction, precheck, and ArgoCD health monitor)
+# Override in values-hub.yaml or pattern values to match your regionalDR cluster names
+managedClusters:
+  primaryName: ocp-primary
+  secondaryName: ocp-secondary
+
 argocdHealthMonitor:
   enabled: true
 

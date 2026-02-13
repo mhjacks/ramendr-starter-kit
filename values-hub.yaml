@@ -1,4 +1,10 @@
 ---
+# Optional: override managed DR cluster names (must match regionalDR cluster names in rdr chart)
+# Uncomment and set when using custom cluster names (e.g. ocp-p, ocp-s)
+# managedClusters:
+#   primaryName: ocp-primary
+#   secondaryName: ocp-secondary
+
 clusterGroup:
   name: hub
   isHubCluster: true

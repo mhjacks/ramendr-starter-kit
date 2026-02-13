@@ -120,7 +120,7 @@ show_usage() {
     echo ""
     echo "Examples:"
     echo "  $0                                    # Download all managed cluster kubeconfigs"
-    echo "  $0 -c ${PRIMARY_CLUSTER:-ocp-primary}          # Download only primary kubeconfig (PRIMARY_CLUSTER env matches values.yaml)"
+    echo "  $0 -c \${PRIMARY_CLUSTER:-ocp-primary}          # Download only primary cluster kubeconfig (set PRIMARY_CLUSTER to match values.yaml)"
     echo "  $0 -o /tmp/kubeconfigs               # Download to /tmp/kubeconfigs directory"
     echo "  $0 --dry-run                         # Show what would be downloaded"
     echo ""

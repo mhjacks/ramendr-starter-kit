@@ -212,9 +212,13 @@ else
   echo "  Found managed clusters: $MANAGED_CLUSTERS"
 fi
 
+# Primary and secondary managed cluster names (from values.yaml via env)
+PRIMARY_CLUSTER="${PRIMARY_CLUSTER:-ocp-primary}"
+SECONDARY_CLUSTER="${SECONDARY_CLUSTER:-ocp-secondary}"
+
 # Extract CA from each managed cluster
 CA_FILES=()
-REQUIRED_CLUSTERS=("hub" "ocp-primary" "ocp-secondary")
+REQUIRED_CLUSTERS=("hub" "$PRIMARY_CLUSTER" "$SECONDARY_CLUSTER")
 EXTRACTED_CLUSTERS=()
 
 # Track hub cluster CA extraction
@@ -291,8 +295,8 @@ if [[ ${#MISSING_CLUSTERS[@]} -gt 0 ]]; then
   echo ""
   echo "The ODF SSL certificate extractor job requires CA material from ALL three clusters:"
   echo "   - hub (hub cluster)"
-  echo "   - ocp-primary (primary managed cluster)"  
-  echo "   - ocp-secondary (secondary managed cluster)"
+  echo "   - $PRIMARY_CLUSTER (primary managed cluster)"
+  echo "   - $SECONDARY_CLUSTER (secondary managed cluster)"
   echo ""
   echo "Without CA material from all clusters, the DR setup will fail."
   echo "Please ensure all clusters are accessible and have proper kubeconfigs."
@@ -1160,7 +1164,7 @@ done
 # Verify distribution to managed clusters
 echo "9. Verifying certificate distribution to managed clusters..."
 verification_failed=false
-REQUIRED_VERIFICATION_CLUSTERS=("ocp-primary" "ocp-secondary")
+REQUIRED_VERIFICATION_CLUSTERS=("$PRIMARY_CLUSTER" "$SECONDARY_CLUSTER")
 VERIFIED_CLUSTERS=()
 
 for cluster in $MANAGED_CLUSTERS; do
@@ -1213,7 +1217,7 @@ if [[ ${#MISSING_VERIFICATION_CLUSTERS[@]} -gt 0 ]]; then
   done
   echo ""
   echo "The ODF SSL certificate extractor job requires successful certificate distribution"
-  echo "to ALL managed clusters (ocp-primary and ocp-secondary)."
+  echo "to ALL managed clusters ($PRIMARY_CLUSTER and $SECONDARY_CLUSTER)."
   echo ""
   echo "Without proper certificate distribution, the DR setup will fail."
   echo "Please check cluster connectivity and kubeconfig availability."

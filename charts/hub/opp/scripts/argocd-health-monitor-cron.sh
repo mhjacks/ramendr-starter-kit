@@ -3,6 +3,10 @@ set -euo pipefail
 
 echo "Starting ArgoCD health monitoring and remediation..."
 
+# Primary and secondary managed cluster names (from values.yaml via env)
+PRIMARY_CLUSTER="${PRIMARY_CLUSTER:-ocp-primary}"
+SECONDARY_CLUSTER="${SECONDARY_CLUSTER:-ocp-secondary}"
+
 # Configuration
 MAX_ATTEMPTS=270  # Check 270 times (90 minutes with 20s intervals) before failing
 SLEEP_INTERVAL=20
@@ -26,11 +30,11 @@ check_cluster_wedged() {
   local cluster_argocd_namespace=""
   local cluster_argocd_instance=""
   case "$cluster" in
-    "ocp-primary")
+    "$PRIMARY_CLUSTER")
       cluster_argocd_namespace="ramendr-starter-kit-resilient"
       cluster_argocd_instance="resilient-gitops-server"
       ;;
-    "ocp-secondary")
+    "$SECONDARY_CLUSTER")
       cluster_argocd_namespace="ramendr-starter-kit-resilient"
       cluster_argocd_instance="resilient-gitops-server"
       ;;

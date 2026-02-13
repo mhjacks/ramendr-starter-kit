@@ -3,6 +3,10 @@ set -euo pipefail
 
 echo "Starting ArgoCD health monitoring and remediation..."
 
+# Primary and secondary managed cluster names (from values.yaml via env)
+PRIMARY_CLUSTER="${PRIMARY_CLUSTER:-ocp-primary}"
+SECONDARY_CLUSTER="${SECONDARY_CLUSTER:-ocp-secondary}"
+
 # Configuration
 MAX_ATTEMPTS=180  # Check 180 times (90 minutes with 30s intervals) before failing
 SLEEP_INTERVAL=30
@@ -26,11 +30,11 @@ check_cluster_wedged() {
   local cluster_argocd_namespace=""
   local cluster_argocd_instance=""
   case "$cluster" in
-    "ocp-primary")
+    "$PRIMARY_CLUSTER")
       cluster_argocd_namespace="ramendr-starter-kit-resilient"
       cluster_argocd_instance="resilient-gitops-server"
       ;;
-    "ocp-secondary")
+    "$SECONDARY_CLUSTER")
       cluster_argocd_namespace="ramendr-starter-kit-resilient"
       cluster_argocd_instance="resilient-gitops-server"
       ;;
@@ -625,10 +629,10 @@ while [[ $attempt -le $MAX_ATTEMPTS ]]; do
     for cluster in "${wedged_clusters[@]}"; do
       kubeconfig_path="/tmp/${cluster}-kubeconfig.yaml"
       
-      # Apply aggressive ArgoCD sync specifically for ocp-secondary if it's wedged
-      if [[ "$cluster" == "ocp-secondary" ]]; then
-        echo "🔄🔄🔄 APPLYING AGGRESSIVE ARGOCD SYNC TO WEDGED OCP-SECONDARY 🔄🔄🔄"
-        echo "  🎯 Target: Force sync all applications and namespace policies on ocp-secondary"
+      # Apply aggressive ArgoCD sync specifically for secondary cluster if it's wedged
+      if [[ "$cluster" == "$SECONDARY_CLUSTER" ]]; then
+        echo "🔄🔄🔄 APPLYING AGGRESSIVE ARGOCD SYNC TO WEDGED SECONDARY CLUSTER ($SECONDARY_CLUSTER) 🔄🔄🔄"
+        echo "  🎯 Target: Force sync all applications and namespace policies on $SECONDARY_CLUSTER"
         apply_aggressive_argocd_sync "$cluster" "$kubeconfig_path"
       else
         echo "🔧 Applying standard ArgoCD sync remediation to wedged cluster: $cluster"

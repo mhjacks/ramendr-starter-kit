@@ -73,8 +73,8 @@ get_target_cluster_from_placement() {
   
   if [[ -z "$PLACEMENT_DECISION" ]]; then
     echo "  ⚠️  Warning: Could not find PlacementDecision for $PLACEMENT_NAME"
-    echo "  Will default to primary cluster (ocp-primary)"
-    TARGET_CLUSTER="ocp-primary"
+    echo "  Will default to primary cluster (${PRIMARY_CLUSTER:-ocp-primary})"
+    TARGET_CLUSTER="${PRIMARY_CLUSTER:-ocp-primary}"
     return 1
   fi
   
@@ -84,8 +84,8 @@ get_target_cluster_from_placement() {
   
   if [[ -z "$TARGET_CLUSTER" ]]; then
     echo "  ⚠️  Warning: Could not determine target cluster from PlacementDecision"
-    echo "  Will default to primary cluster (ocp-primary)"
-    TARGET_CLUSTER="ocp-primary"
+    echo "  Will default to primary cluster (${PRIMARY_CLUSTER:-ocp-primary})"
+    TARGET_CLUSTER="${PRIMARY_CLUSTER:-ocp-primary}"
     return 1
   fi
   
@@ -120,8 +120,11 @@ get_target_cluster_kubeconfig() {
   fi
 }
 
+# Primary cluster name (from values.yaml via env when run in cluster)
+PRIMARY_CLUSTER="${PRIMARY_CLUSTER:-ocp-primary}"
+
 # Get target cluster from Placement resource
-TARGET_CLUSTER="ocp-primary"  # Default to primary
+TARGET_CLUSTER="$PRIMARY_CLUSTER"  # Default to primary
 if get_target_cluster_from_placement; then
   echo "  Target cluster: $TARGET_CLUSTER"
 else

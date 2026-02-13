@@ -18,6 +18,11 @@ spec:
       containers:
       - name: argocd-health-monitor
         image: registry.redhat.io/openshift4/ose-cli:latest
+        env:
+        - name: PRIMARY_CLUSTER
+          value: {{ index (index .Values "managedClusters" | default dict) "primaryName" | default "ocp-primary" | quote }}
+        - name: SECONDARY_CLUSTER
+          value: {{ index (index .Values "managedClusters" | default dict) "secondaryName" | default "ocp-secondary" | quote }}
         command:
         - /bin/bash
         - -c
