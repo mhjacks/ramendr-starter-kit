@@ -1,4 +1,14 @@
 ---
+# DR pair cluster names - same structure as rdr chart. opp-policy reads this.
+# For rdr chart, merge values-hub first then rdr/values so full regionalDR is preserved.
+regionalDR:
+  - name: resilient
+    clusters:
+      primary:
+        name: ocp-primary
+      secondary:
+        name: ocp-secondary
+
 clusterGroup:
   name: hub
   isHubCluster: true

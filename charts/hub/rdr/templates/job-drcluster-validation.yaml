@@ -34,9 +34,9 @@ spec:
           
           echo "Starting DRCluster validation check..."
           
-          # Configuration (from values-hub managedClusters - single source of truth)
-          PRIMARY_CLUSTER="{{ index (index $.Values "managedClusters" | default dict) "primaryName" | default "ocp-primary" }}"
-          SECONDARY_CLUSTER="{{ index (index $.Values "managedClusters" | default dict) "secondaryName" | default "ocp-secondary" }}"
+          # Configuration (from regionalDR - same structure as rdr chart)
+          PRIMARY_CLUSTER="{{ (index $.Values.regionalDR 0).clusters.primary.name }}"
+          SECONDARY_CLUSTER="{{ (index $.Values.regionalDR 0).clusters.secondary.name }}"
           DRPOLICY_NAME="{{ $name }}"
           MAX_ATTEMPTS=120  # 2 hours with 1 minute intervals
           SLEEP_INTERVAL=60  # 1 minute between checks

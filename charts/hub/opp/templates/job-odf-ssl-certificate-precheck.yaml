@@ -32,9 +32,9 @@ spec:
             cpu: "100m"
         env:
         - name: PRIMARY_CLUSTER
-          value: {{ index (index .Values "managedClusters" | default dict) "primaryName" | default "ocp-primary" | quote }}
+          value: {{ if and .Values.regionalDR (index .Values.regionalDR 0) }}{{ (index .Values.regionalDR 0).clusters.primary.name | default "ocp-primary" | quote }}{{ else }}"ocp-primary"{{ end }}
         - name: SECONDARY_CLUSTER
-          value: {{ index (index .Values "managedClusters" | default dict) "secondaryName" | default "ocp-secondary" | quote }}
+          value: {{ if and .Values.regionalDR (index .Values.regionalDR 0) }}{{ (index .Values.regionalDR 0).clusters.secondary.name | default "ocp-secondary" | quote }}{{ else }}"ocp-secondary"{{ end }}
         command:
         - /bin/bash
         - -c

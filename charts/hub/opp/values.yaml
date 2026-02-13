@@ -1,14 +1,13 @@
-# No Values
-# Need to use fromSecret for these keys. problems ith json output.
-##  accessKey: '{{ `{{ fromSecret "openshift-storage" "noobaa-admin" "AWS_ACCESS_KEY_ID" }}` }}'
-##  secretKey: '{{ `{{ fromSecret "openshift-storage" "noobaa-admin" "AWS_SECRET_ACCESS_KEY" }}` }}'
-
-# Managed cluster names for the DR pair (used by SSL extraction, precheck, and ArgoCD health monitor).
-# Defaults here; override in values-hub.yaml (single source of truth for both opp-policy and rdr).
-managedClusters:
-  primaryName: ocp-primary
-  secondaryName: ocp-secondary
+---
+# DR pair cluster names - same structure as rdr chart (regionalDR).
+# Override via values-hub or overrides so opp-policy and rdr use the same names.
+regionalDR:
+  - name: resilient
+    clusters:
+      primary:
+        name: ocp-primary
+      secondary:
+        name: ocp-secondary
 
 argocdHealthMonitor:
   enabled: true
-

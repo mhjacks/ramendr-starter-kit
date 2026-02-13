@@ -19,9 +19,9 @@ spec:
         image: registry.redhat.io/openshift4/ose-cli:latest
         env:
         - name: PRIMARY_CLUSTER
-          value: {{ index (index .Values "managedClusters" | default dict) "primaryName" | default "ocp-primary" | quote }}
+          value: {{ (index .Values.regionalDR 0).clusters.primary.name | quote }}
         - name: SECONDARY_CLUSTER
-          value: {{ index (index .Values "managedClusters" | default dict) "secondaryName" | default "ocp-secondary" | quote }}
+          value: {{ (index .Values.regionalDR 0).clusters.secondary.name | quote }}
         command:
         - /bin/bash
         - -c

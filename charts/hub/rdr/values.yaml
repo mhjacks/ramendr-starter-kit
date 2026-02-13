@@ -2,12 +2,6 @@
 global:
   clusterDomain: cluster.example.com
 
-# DR pair cluster names - keep in sync with values-hub.yaml managedClusters when using the pattern.
-# Both opp-policy and rdr read from values-hub.managedClusters when deployed via the hub pattern.
-managedClusters:
-  primaryName: ocp-primary
-  secondaryName: ocp-secondary
-
 regionalDR:
   - name: resilient # Matches with ClusterSet
     globalnetEnabled: false # Support for overlapping CIDR

@@ -1,7 +1,11 @@
 ---
-# Single source of truth for DR pair cluster names - used by both opp-policy and rdr charts.
-# Set these to match your managed cluster names (e.g. ocp-primary/ocp-secondary or ocp-p/ocp-s).
-# When using custom names, ensure regionalDR in rdr chart (or overrides) uses the same names.
-managedClusters:
-  primaryName: ocp-primary
-  secondaryName: ocp-secondary
+# Override DR pair cluster names - same structure as rdr chart (regionalDR).
+# Use this file to set custom names (e.g. ocp-p, ocp-s).
+# For rdr chart: merge this before rdr/values so full regionalDR (install_config etc.) is preserved.
+regionalDR:
+  - name: resilient
+    clusters:
+      primary:
+        name: ocp-primary
+      secondary:
+        name: ocp-secondary
