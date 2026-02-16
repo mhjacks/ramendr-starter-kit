@@ -473,13 +473,14 @@ if oc get configmap ramen-hub-operator-config -n openshift-operators &>/dev/null
     EXISTING_PROFILE_COUNT=$((10#$EXISTING_PROFILE_COUNT))
     if [[ $EXISTING_PROFILE_COUNT -lt $MIN_REQUIRED_PROFILES ]]; then
       echo "  ❌ CRITICAL: Insufficient s3StoreProfiles found in existing ConfigMap"
-      echo "     Found: $EXISTING_PROFILE_COUNT profile(s)"
-      echo "     Required: At least $MIN_REQUIRED_PROFILES profiles"
+      echo "     Found: $EXISTING_PROFILE_COUNT profile(s) (required: at least $MIN_REQUIRED_PROFILES)"
+      echo "     RamenConfig may have s3StoreProfiles at top level or under kubeObjectProtection.s3StoreProfiles."
       echo "     Current YAML content (first 50 lines):"
       echo "$EXISTING_YAML" | head -n 50
       echo ""
-      echo "     The certificate extractor requires at least $MIN_REQUIRED_PROFILES S3profiles to add CA certificates."
-      echo "     Please ensure the ramen-hub-operator-config ConfigMap has at least $MIN_REQUIRED_PROFILES s3StoreProfiles configured."
+      echo "     The Ramen hub operator or ODF must create at least $MIN_REQUIRED_PROFILES s3StoreProfiles in"
+      echo "     ramen-hub-operator-config before this job can add CA certificates. Do not create the ConfigMap"
+      echo "     with only base RamenConfig fields (health, metrics, kubeObjectProtection: {}, etc.)."
       handle_error "Insufficient s3StoreProfiles found: found $EXISTING_PROFILE_COUNT profile(s), but at least $MIN_REQUIRED_PROFILES are required"
     else
       echo "  ✅ Found $EXISTING_PROFILE_COUNT s3StoreProfiles (minimum required: $MIN_REQUIRED_PROFILES)"
@@ -509,11 +510,21 @@ import os
 
 ca_bundle = os.environ.get('CA_BUNDLE_BASE64', '')
 
-def update_profiles(profiles):
+def update_profiles_list(profiles):
     count = 0
     if not profiles:
         return count
     for profile in profiles:
+        if isinstance(profile, dict):
+            profile['caCertificates'] = ca_bundle
+            count += 1
+    return count
+
+def update_profiles_dict(profiles_map):
+    count = 0
+    if not isinstance(profiles_map, dict):
+        return count
+    for key, profile in profiles_map.items():
         if isinstance(profile, dict):
             profile['caCertificates'] = ca_bundle
             count += 1
@@ -527,21 +538,37 @@ try:
         config = {}
     
     updated_count = 0
-    # Top-level s3StoreProfiles (some Ramen versions)
+    # Top-level s3StoreProfiles (list or dict)
     if 's3StoreProfiles' in config and config['s3StoreProfiles']:
-        updated_count += update_profiles(config['s3StoreProfiles'])
+        sp = config['s3StoreProfiles']
+        if isinstance(sp, list):
+            updated_count += update_profiles_list(sp)
+        else:
+            updated_count += update_profiles_dict(sp)
     # kubeObjectProtection.s3StoreProfiles (RamenConfig structure)
     if 'kubeObjectProtection' not in config:
         config['kubeObjectProtection'] = {}
     kop = config['kubeObjectProtection']
     if isinstance(kop, dict) and 's3StoreProfiles' in kop and kop['s3StoreProfiles']:
-        updated_count += update_profiles(kop['s3StoreProfiles'])
+        sp = kop['s3StoreProfiles']
+        if isinstance(sp, list):
+            updated_count += update_profiles_list(sp)
+        else:
+            updated_count += update_profiles_dict(sp)
     
     print(f'Updated {updated_count} s3StoreProfiles with caCertificates', file=sys.stderr)
     
     with open('$WORK_DIR/existing-ramen-config.yaml', 'w') as f:
         yaml.dump(config, f, default_flow_style=False, sort_keys=False, allow_unicode=True)
+        f.flush()
+        os.fsync(f.fileno())
     
+    # Verify write: re-read and confirm caCertificates is present
+    with open('$WORK_DIR/existing-ramen-config.yaml', 'r') as f:
+        check = f.read()
+    if 'caCertificates' not in check and updated_count > 0:
+        print('ERROR: caCertificates not found in file after write', file=sys.stderr)
+        sys.exit(1)
     print('SUCCESS', file=sys.stderr)
     sys.exit(0)
 except Exception as e:
@@ -634,6 +661,54 @@ except Exception as e:
         }
       }
     fi
+
+    # Method 4: If still no caCertificates, try Python deep-search for any profile-like list (any path)
+    if [[ "$PYTHON_SUCCESS" != "true" ]] && [[ -f "$WORK_DIR/existing-ramen-config.yaml" ]] && ! grep -q "caCertificates" "$WORK_DIR/existing-ramen-config.yaml" 2>/dev/null; then
+      echo "  Trying Python deep-search for s3StoreProfiles (any path)..."
+      export CA_BUNDLE_BASE64
+      if python3 -c "
+import yaml
+import os
+
+ca_bundle = os.environ.get('CA_BUNDLE_BASE64', '')
+PROFILE_KEYS = ('s3ProfileName', 's3Bucket', 's3Region', 'name', 'endpoint')
+
+def looks_like_profile(d):
+    return isinstance(d, dict) and any(k in d for k in PROFILE_KEYS)
+
+def add_ca_deep(obj, count):
+    if isinstance(obj, list):
+        for i, item in enumerate(obj):
+            if looks_like_profile(item):
+                item['caCertificates'] = ca_bundle
+                count += 1
+            else:
+                count = add_ca_deep(item, count)
+    elif isinstance(obj, dict):
+        for v in obj.values():
+            count = add_ca_deep(v, count)
+    return count
+
+try:
+    with open('$WORK_DIR/existing-ramen-config.yaml', 'r') as f:
+        config = yaml.safe_load(f) or {}
+    n = add_ca_deep(config, 0)
+    if n > 0:
+        with open('$WORK_DIR/existing-ramen-config.yaml', 'w') as f:
+            yaml.dump(config, f, default_flow_style=False, sort_keys=False, allow_unicode=True)
+            f.flush()
+            os.fsync(f.fileno())
+        print(f'Deep-search updated {n} profile(s) with caCertificates', file=__import__('sys').stderr)
+        __import__('sys').exit(0)
+    __import__('sys').exit(1)
+except Exception as e:
+    print(str(e), file=__import__('sys').stderr)
+    __import__('sys').exit(1)
+" 2>&1; then
+        echo "  ✅ Updated s3StoreProfiles using Python deep-search"
+        PYTHON_SUCCESS=true
+      fi
+    fi
     
     # Clean up temporary files
     rm -f "$WORK_DIR/existing-ramen-config.yaml.bak" "$WORK_DIR/existing-ramen-config.yaml.tmp"
@@ -644,11 +719,14 @@ except Exception as e:
       echo "  Updated YAML content (first 20 lines):"
       echo "$UPDATED_YAML" | head -n 20
       
-      # Verify caCertificates was added
-      if echo "$UPDATED_YAML" | grep -q "caCertificates"; then
-        echo "  ✅ Verified: caCertificates found in updated YAML"
+      # CRITICAL: Do not overwrite ConfigMap if we failed to add caCertificates
+      if ! echo "$UPDATED_YAML" | grep -q "caCertificates"; then
+        echo "  ❌ CRITICAL: caCertificates not found in updated YAML - no s3StoreProfiles were updated."
+        echo "     The ramen_manager_config must have at least 2 s3StoreProfiles (under top-level or kubeObjectProtection)."
+        echo "     Ensure the Ramen hub operator or ODF has created s3StoreProfiles in ramen-hub-operator-config first."
+        handle_error "Cannot update ConfigMap: no s3StoreProfiles found in config to add caCertificates to"
       else
-        echo "  ⚠️  Warning: caCertificates not found in updated YAML"
+        echo "  ✅ Verified: caCertificates found in updated YAML"
       fi
     else
       echo "  ❌ Error: Updated YAML file not found"
@@ -663,7 +741,7 @@ except Exception as e:
     caCertificates: \"$CA_BUNDLE_BASE64\""
   fi
   
-  # Save updated YAML to a file for use with oc set data
+  # Save updated YAML to a file for use with oc set data / manifest
   echo "$UPDATED_YAML" > "$WORK_DIR/ramen_manager_config.yaml"
   
   echo "  Preparing to update ConfigMap with YAML content..."
@@ -671,95 +749,26 @@ except Exception as e:
   echo "  YAML file preview (first 10 lines):"
   head -n 10 "$WORK_DIR/ramen_manager_config.yaml"
   
-  # Update the ConfigMap using oc create with --dry-run=client and oc apply
-  # This is more reliable than oc set data for multiline content
+  # Build ConfigMap manifest: use literal-block method first (reliable, no yq/Python dependency)
   echo "  Creating ConfigMap manifest with updated data..."
   oc get configmap ramen-hub-operator-config -n openshift-operators -o yaml > "$WORK_DIR/ramen-configmap-template.yaml" 2>/dev/null
   
   if [[ -f "$WORK_DIR/ramen-configmap-template.yaml" ]]; then
-    # Update the data section using yq or python
-    if command -v yq &>/dev/null; then
-      yq eval ".data.\"ramen_manager_config.yaml\" = load(\"$WORK_DIR/ramen_manager_config.yaml\") | .data.\"ramen_manager_config.yaml\" style=\"literal\"" -i "$WORK_DIR/ramen-configmap-template.yaml" 2>/dev/null || {
-        # Fallback: use python to update
-        python3 -c "
-import yaml
-import sys
-
-# Read the ConfigMap
-with open('$WORK_DIR/ramen-configmap-template.yaml', 'r') as f:
-    cm = yaml.safe_load(f)
-
-# Read the updated YAML content
-with open('$WORK_DIR/ramen_manager_config.yaml', 'r') as f:
-    updated_yaml = f.read()
-
-# Update the data section
-if 'data' not in cm:
-    cm['data'] = {}
-
-cm['data']['ramen_manager_config.yaml'] = updated_yaml
-
-# Keep metadata but remove fields that Kubernetes manages (oc apply will update these)
-if 'metadata' in cm:
-    # Remove only the fields that Kubernetes manages and shouldn't be in the apply
-    cm['metadata'].pop('resourceVersion', None)
-    cm['metadata'].pop('managedFields', None)
-
-# Write back (width=4096 helps PyYAML use block style for long config string)
-with open('$WORK_DIR/ramen-configmap-updated.yaml', 'w') as f:
-    yaml.dump(cm, f, default_flow_style=False, sort_keys=False, allow_unicode=True, width=4096)
-" 2>/dev/null
-      }
-    else
-      # Use python to update
-      python3 -c "
-import yaml
-import sys
-
-# Read the ConfigMap
-with open('$WORK_DIR/ramen-configmap-template.yaml', 'r') as f:
-    cm = yaml.safe_load(f)
-
-# Read the updated YAML content
-with open('$WORK_DIR/ramen_manager_config.yaml', 'r') as f:
-    updated_yaml = f.read()
-
-# Update the data section
-if 'data' not in cm:
-    cm['data'] = {}
-
-cm['data']['ramen_manager_config.yaml'] = updated_yaml
-
-# Keep metadata but remove fields that Kubernetes manages (oc apply will update these)
-if 'metadata' in cm:
-    # Remove only the fields that Kubernetes manages and shouldn't be in the apply
-    cm['metadata'].pop('resourceVersion', None)
-    cm['metadata'].pop('managedFields', None)
-
-# Write back
-with open('$WORK_DIR/ramen-configmap-updated.yaml', 'w') as f:
-    yaml.dump(cm, f, default_flow_style=False, sort_keys=False, allow_unicode=True, width=4096)
-" 2>/dev/null
-    fi
-
-    # If manifest still missing (yq/Python failed), build it with literal block for config data
-    if [[ ! -f "$WORK_DIR/ramen-configmap-updated.yaml" ]]; then
-      echo "  Building ConfigMap manifest using literal block for config data..."
-      METADATA_NAMESPACE=$(grep -E '^\s+namespace:' "$WORK_DIR/ramen-configmap-template.yaml" | head -1 | sed 's/.*namespace:[[:space:]]*//')
-      METADATA_NAME=$(grep -E '^\s+name:' "$WORK_DIR/ramen-configmap-template.yaml" | head -1 | sed 's/.*name:[[:space:]]*//')
-      [[ -z "$METADATA_NAMESPACE" ]] && METADATA_NAMESPACE=openshift-operators
-      [[ -z "$METADATA_NAME" ]] && METADATA_NAME=ramen-hub-operator-config
-      {
-        echo "apiVersion: v1"
-        echo "kind: ConfigMap"
-        echo "metadata:"
-        echo "  name: $METADATA_NAME"
-        echo "  namespace: $METADATA_NAMESPACE"
-        echo "data:"
-        echo "  ramen_manager_config.yaml: |"
-        sed 's/^/    /' "$WORK_DIR/ramen_manager_config.yaml"
-      } > "$WORK_DIR/ramen-configmap-updated.yaml"
-    fi
+    METADATA_NAMESPACE=$(grep -E '^\s+namespace:' "$WORK_DIR/ramen-configmap-template.yaml" | head -1 | sed 's/.*namespace:[[:space:]]*//')
+    METADATA_NAME=$(grep -E '^\s+name:' "$WORK_DIR/ramen-configmap-template.yaml" | head -1 | sed 's/.*name:[[:space:]]*//')
+    [[ -z "$METADATA_NAMESPACE" ]] && METADATA_NAMESPACE=openshift-operators
+    [[ -z "$METADATA_NAME" ]] && METADATA_NAME=ramen-hub-operator-config
+    echo "  Building ConfigMap manifest (literal block for ramen_manager_config.yaml)..."
+    {
+      echo "apiVersion: v1"
+      echo "kind: ConfigMap"
+      echo "metadata:"
+      echo "  name: $METADATA_NAME"
+      echo "  namespace: $METADATA_NAMESPACE"
+      echo "data:"
+      echo "  ramen_manager_config.yaml: |"
+      sed 's/^/    /' "$WORK_DIR/ramen_manager_config.yaml"
+    } > "$WORK_DIR/ramen-configmap-updated.yaml"
 
     if [[ -f "$WORK_DIR/ramen-configmap-updated.yaml" ]]; then
       echo "  Applying updated ConfigMap..."
