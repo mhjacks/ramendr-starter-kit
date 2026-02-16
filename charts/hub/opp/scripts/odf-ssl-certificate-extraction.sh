@@ -472,16 +472,16 @@ if oc get configmap ramen-hub-operator-config -n openshift-operators &>/dev/null
     EXISTING_PROFILE_COUNT=$(echo "$EXISTING_PROFILE_COUNT" | tr -d ' \n\r' | grep -E '^[0-9]+$' || echo "0")
     EXISTING_PROFILE_COUNT=$((10#$EXISTING_PROFILE_COUNT))
     if [[ $EXISTING_PROFILE_COUNT -lt $MIN_REQUIRED_PROFILES ]]; then
-      echo "  ❌ CRITICAL: Insufficient s3StoreProfiles found in existing ConfigMap"
+      echo "  ❌ CRITICAL: Insufficient s3StoreProfiles in ramen-hub-operator-config (cannot add CA until profiles exist)"
       echo "     Found: $EXISTING_PROFILE_COUNT profile(s) (required: at least $MIN_REQUIRED_PROFILES)"
       echo "     RamenConfig may have s3StoreProfiles at top level or under kubeObjectProtection.s3StoreProfiles."
-      echo "     Current YAML content (first 50 lines):"
+      echo "     Current YAML snippet:"
       echo "$EXISTING_YAML" | head -n 50
       echo ""
-      echo "     The Ramen hub operator or ODF must create at least $MIN_REQUIRED_PROFILES s3StoreProfiles in"
-      echo "     ramen-hub-operator-config before this job can add CA certificates. Do not create the ConfigMap"
-      echo "     with only base RamenConfig fields (health, metrics, kubeObjectProtection: {}, etc.)."
-      handle_error "Insufficient s3StoreProfiles found: found $EXISTING_PROFILE_COUNT profile(s), but at least $MIN_REQUIRED_PROFILES are required"
+      echo "     ACTION REQUIRED: Configure at least $MIN_REQUIRED_PROFILES S3 store profiles in ramen-hub-operator-config"
+      echo "     (e.g. via Ramen hub operator or ODF). This job only adds caCertificates to existing profiles;"
+      echo "     it cannot create profiles. Retrying will not help until s3StoreProfiles is populated."
+      exit 1
     else
       echo "  ✅ Found $EXISTING_PROFILE_COUNT s3StoreProfiles (minimum required: $MIN_REQUIRED_PROFILES)"
     fi
@@ -1414,7 +1414,12 @@ if [[ "$FINAL_VERIFICATION_PASSED" != "true" ]]; then
   echo "     Current ConfigMap YAML content:"
   echo "$FINAL_VERIFIED_YAML"
   echo ""
-  echo "     The ConfigMap edit is not complete and correct until the CA material has been added to the S3profiles."
+  if [[ $FINAL_PROFILE_COUNT -eq 0 ]]; then
+    echo "     s3StoreProfiles is empty ([]). Configure at least 2 S3 store profiles in ramen-hub-operator-config"
+    echo "     (via Ramen hub operator or ODF) before this job can add CA certificates. This job cannot create profiles."
+  else
+    echo "     The ConfigMap edit is not complete until CA material has been added to all S3 profiles."
+  fi
   echo "     This is a CRITICAL error - the job cannot complete successfully."
   handle_error "Final verification failed - ramen-hub-operator-config is not complete and correct - CA material not in s3StoreProfiles"
   # After handle_error, return failure to trigger retry in main loop
