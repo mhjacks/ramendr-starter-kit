@@ -1313,13 +1313,14 @@ fi
 # CRITICAL: Must find at least 2 S3profiles
 MIN_REQUIRED_PROFILES=2
 if echo "$FINAL_VERIFIED_YAML" | grep -q "s3StoreProfiles"; then
-  # Use yq to properly parse YAML and count profiles
   if command -v yq &>/dev/null; then
     FINAL_PROFILE_COUNT=$(echo "$FINAL_VERIFIED_YAML" | yq eval '.s3StoreProfiles | length' 2>/dev/null || echo "0")
-    # Count profiles that have caCertificates field
-    FINAL_CA_CERT_COUNT=$(echo "$FINAL_VERIFIED_YAML" | yq eval '[.s3StoreProfiles[] | select(has("caCertificates"))] | length' 2>/dev/null || echo "0")
+    FINAL_CA_CERT_COUNT=$(echo "$FINAL_VERIFIED_YAML" | yq eval '[.s3StoreProfiles[]? | select(has("caCertificates"))] | length' 2>/dev/null || echo "0")
+    if [[ "${FINAL_PROFILE_COUNT:-0}" -lt $MIN_REQUIRED_PROFILES ]]; then
+      FINAL_PROFILE_COUNT=$(echo "$FINAL_VERIFIED_YAML" | yq eval '.kubeObjectProtection.s3StoreProfiles | length' 2>/dev/null || echo "0")
+      FINAL_CA_CERT_COUNT=$(echo "$FINAL_VERIFIED_YAML" | yq eval '[.kubeObjectProtection.s3StoreProfiles[]? | select(has("caCertificates"))] | length' 2>/dev/null || echo "0")
+    fi
   else
-    # Fallback to grep if yq is not available
     FINAL_PROFILE_COUNT=$(echo "$FINAL_VERIFIED_YAML" | grep -c "s3ProfileName:" 2>/dev/null || echo "0")
     if [[ $FINAL_PROFILE_COUNT -eq 0 ]]; then
       FINAL_PROFILE_COUNT=$(echo "$FINAL_VERIFIED_YAML" | grep -c "s3Bucket:" 2>/dev/null || echo "0")
