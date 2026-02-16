@@ -455,13 +455,15 @@ if oc get configmap ramen-hub-operator-config -n openshift-operators &>/dev/null
   EXISTING_YAML=$(oc get configmap ramen-hub-operator-config -n openshift-operators -o jsonpath='{.data.ramen_manager_config\.yaml}' 2>/dev/null || echo "")
   
   # We need exactly 2 s3StoreProfiles; script will create them if missing or insufficient
+  # Match structure: s3StoreProfiles may be under kubeObjectProtection or at top level
   MIN_REQUIRED_PROFILES=2
   if [[ -n "$EXISTING_YAML" ]]; then
     if command -v yq &>/dev/null; then
-      EXISTING_PROFILE_COUNT=$(echo "$EXISTING_YAML" | yq eval '.s3StoreProfiles | length' 2>/dev/null || echo "0")
-      if [[ "${EXISTING_PROFILE_COUNT:-0}" -lt $MIN_REQUIRED_PROFILES ]]; then
-        EXISTING_PROFILE_COUNT=$(echo "$EXISTING_YAML" | yq eval '.kubeObjectProtection.s3StoreProfiles | length' 2>/dev/null || echo "0")
-      fi
+      COUNT_KOP=$(echo "$EXISTING_YAML" | yq eval '.kubeObjectProtection.s3StoreProfiles | length' 2>/dev/null || echo "0")
+      COUNT_TOP=$(echo "$EXISTING_YAML" | yq eval '.s3StoreProfiles | length' 2>/dev/null || echo "0")
+      COUNT_KOP=$((10#${COUNT_KOP:-0}))
+      COUNT_TOP=$((10#${COUNT_TOP:-0}))
+      EXISTING_PROFILE_COUNT=$(( COUNT_KOP >= COUNT_TOP ? COUNT_KOP : COUNT_TOP ))
     else
       EXISTING_PROFILE_COUNT=$(echo "$EXISTING_YAML" | grep -c "s3ProfileName:" 2>/dev/null || echo "0")
       if [[ $EXISTING_PROFILE_COUNT -eq 0 ]]; then
@@ -817,17 +819,16 @@ except Exception as e:
       fi
     fi
 
-    # Additional check: verify that each s3StoreProfiles item has caCertificates
-    # RamenConfig may have s3StoreProfiles at top level OR under kubeObjectProtection
+    # Verify structure: s3StoreProfiles under kubeObjectProtection or at top level (match script output)
     MIN_REQUIRED_PROFILES=2
     if echo "$VERIFIED_YAML" | grep -q "s3StoreProfiles"; then
       if command -v yq &>/dev/null; then
-        PROFILE_COUNT=$(echo "$VERIFIED_YAML" | yq eval '.s3StoreProfiles | length' 2>/dev/null || echo "0")
-        CA_CERT_COUNT=$(echo "$VERIFIED_YAML" | yq eval '[.s3StoreProfiles[]? | select(has("caCertificates"))] | length' 2>/dev/null || echo "0")
-        if [[ "${PROFILE_COUNT:-0}" -lt $MIN_REQUIRED_PROFILES ]]; then
-          PROFILE_COUNT=$(echo "$VERIFIED_YAML" | yq eval '.kubeObjectProtection.s3StoreProfiles | length' 2>/dev/null || echo "0")
-          CA_CERT_COUNT=$(echo "$VERIFIED_YAML" | yq eval '[.kubeObjectProtection.s3StoreProfiles[]? | select(has("caCertificates"))] | length' 2>/dev/null || echo "0")
-        fi
+        PK=$(echo "$VERIFIED_YAML" | yq eval '.kubeObjectProtection.s3StoreProfiles | length' 2>/dev/null || echo "0")
+        PT=$(echo "$VERIFIED_YAML" | yq eval '.s3StoreProfiles | length' 2>/dev/null || echo "0")
+        PROFILE_COUNT=$(( PK >= PT ? PK : PT ))
+        CK=$(echo "$VERIFIED_YAML" | yq eval '[.kubeObjectProtection.s3StoreProfiles[]? | select(has("caCertificates"))] | length' 2>/dev/null || echo "0")
+        CT=$(echo "$VERIFIED_YAML" | yq eval '[.s3StoreProfiles[]? | select(has("caCertificates"))] | length' 2>/dev/null || echo "0")
+        CA_CERT_COUNT=$(( CK >= CT ? CK : CT ))
       else
         # Fallback to grep if yq is not available
         PROFILE_COUNT=$(echo "$VERIFIED_YAML" | grep -c "s3ProfileName:" 2>/dev/null || echo "0")
@@ -960,17 +961,16 @@ with open('$WORK_DIR/ramen-patch.json', 'w') as f:
               VERIFICATION_ERRORS+=("caCertificates not found")
             fi
             
-            # Verify each profile has caCertificates
-            # CRITICAL: Must find at least 2 S3profiles
+            # Verify structure: s3StoreProfiles under kubeObjectProtection or at top level (match script output)
             MIN_REQUIRED_PROFILES=2
             if echo "$VERIFIED_YAML" | grep -q "s3StoreProfiles"; then
               if command -v yq &>/dev/null; then
-                PROFILE_COUNT=$(echo "$VERIFIED_YAML" | yq eval '.s3StoreProfiles | length' 2>/dev/null || echo "0")
-                CA_CERT_COUNT=$(echo "$VERIFIED_YAML" | yq eval '[.s3StoreProfiles[]? | select(has("caCertificates"))] | length' 2>/dev/null || echo "0")
-                if [[ "${PROFILE_COUNT:-0}" -lt $MIN_REQUIRED_PROFILES ]]; then
-                  PROFILE_COUNT=$(echo "$VERIFIED_YAML" | yq eval '.kubeObjectProtection.s3StoreProfiles | length' 2>/dev/null || echo "0")
-                  CA_CERT_COUNT=$(echo "$VERIFIED_YAML" | yq eval '[.kubeObjectProtection.s3StoreProfiles[]? | select(has("caCertificates"))] | length' 2>/dev/null || echo "0")
-                fi
+                PK=$(echo "$VERIFIED_YAML" | yq eval '.kubeObjectProtection.s3StoreProfiles | length' 2>/dev/null || echo "0")
+                PT=$(echo "$VERIFIED_YAML" | yq eval '.s3StoreProfiles | length' 2>/dev/null || echo "0")
+                PROFILE_COUNT=$(( PK >= PT ? PK : PT ))
+                CK=$(echo "$VERIFIED_YAML" | yq eval '[.kubeObjectProtection.s3StoreProfiles[]? | select(has("caCertificates"))] | length' 2>/dev/null || echo "0")
+                CT=$(echo "$VERIFIED_YAML" | yq eval '[.s3StoreProfiles[]? | select(has("caCertificates"))] | length' 2>/dev/null || echo "0")
+                CA_CERT_COUNT=$(( CK >= CT ? CK : CT ))
               else
                 PROFILE_COUNT=$(echo "$VERIFIED_YAML" | grep -c "s3ProfileName:" 2>/dev/null || echo "0")
                 if [[ $PROFILE_COUNT -eq 0 ]]; then
@@ -1313,19 +1313,16 @@ if ! echo "$FINAL_VERIFIED_YAML" | grep -q "caCertificates"; then
   FINAL_VERIFICATION_ERRORS+=("caCertificates not found in final verification")
 fi
 
-# Do not require exact full base64 match; stored ConfigMap may encode/wrap differently
-
-# Verify each profile has caCertificates
-# CRITICAL: Must find at least 2 S3profiles
+# Verify structure: s3StoreProfiles under kubeObjectProtection or at top level (match script output)
 MIN_REQUIRED_PROFILES=2
 if echo "$FINAL_VERIFIED_YAML" | grep -q "s3StoreProfiles"; then
   if command -v yq &>/dev/null; then
-    FINAL_PROFILE_COUNT=$(echo "$FINAL_VERIFIED_YAML" | yq eval '.s3StoreProfiles | length' 2>/dev/null || echo "0")
-    FINAL_CA_CERT_COUNT=$(echo "$FINAL_VERIFIED_YAML" | yq eval '[.s3StoreProfiles[]? | select(has("caCertificates"))] | length' 2>/dev/null || echo "0")
-    if [[ "${FINAL_PROFILE_COUNT:-0}" -lt $MIN_REQUIRED_PROFILES ]]; then
-      FINAL_PROFILE_COUNT=$(echo "$FINAL_VERIFIED_YAML" | yq eval '.kubeObjectProtection.s3StoreProfiles | length' 2>/dev/null || echo "0")
-      FINAL_CA_CERT_COUNT=$(echo "$FINAL_VERIFIED_YAML" | yq eval '[.kubeObjectProtection.s3StoreProfiles[]? | select(has("caCertificates"))] | length' 2>/dev/null || echo "0")
-    fi
+    PK=$(echo "$FINAL_VERIFIED_YAML" | yq eval '.kubeObjectProtection.s3StoreProfiles | length' 2>/dev/null || echo "0")
+    PT=$(echo "$FINAL_VERIFIED_YAML" | yq eval '.s3StoreProfiles | length' 2>/dev/null || echo "0")
+    FINAL_PROFILE_COUNT=$(( PK >= PT ? PK : PT ))
+    CK=$(echo "$FINAL_VERIFIED_YAML" | yq eval '[.kubeObjectProtection.s3StoreProfiles[]? | select(has("caCertificates"))] | length' 2>/dev/null || echo "0")
+    CT=$(echo "$FINAL_VERIFIED_YAML" | yq eval '[.s3StoreProfiles[]? | select(has("caCertificates"))] | length' 2>/dev/null || echo "0")
+    FINAL_CA_CERT_COUNT=$(( CK >= CT ? CK : CT ))
   else
     FINAL_PROFILE_COUNT=$(echo "$FINAL_VERIFIED_YAML" | grep -c "s3ProfileName:" 2>/dev/null || echo "0")
     if [[ $FINAL_PROFILE_COUNT -eq 0 ]]; then
