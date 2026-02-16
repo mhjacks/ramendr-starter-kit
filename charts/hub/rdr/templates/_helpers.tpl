@@ -6,7 +6,7 @@
 {{- $dr := index .Values.regionalDR 0 -}}
 {{- $over := index (.Values.clusterOverrides | default dict) "primary" | default dict -}}
 {{- $base := $dr.clusters.primary -}}
-{{- $installConfig := merge $base.install_config (index $over "install_config" | default dict) -}}
+{{- $installConfig := merge ($base.install_config | default dict) (index $over "install_config" | default dict) -}}
 {{- dict "name" (index $over "name" | default $base.name) "version" (index $over "version" | default $base.version) "clusterGroup" $base.clusterGroup "install_config" $installConfig | toJson -}}
 {{- end -}}
 
@@ -17,7 +17,7 @@
 {{- $dr := index .Values.regionalDR 0 -}}
 {{- $over := index (.Values.clusterOverrides | default dict) "secondary" | default dict -}}
 {{- $base := $dr.clusters.secondary -}}
-{{- $installConfig := merge $base.install_config (index $over "install_config" | default dict) -}}
+{{- $installConfig := merge ($base.install_config | default dict) (index $over "install_config" | default dict) -}}
 {{- dict "name" (index $over "name" | default $base.name) "version" (index $over "version" | default $base.version) "clusterGroup" $base.clusterGroup "install_config" $installConfig | toJson -}}
 {{- end -}}
 
