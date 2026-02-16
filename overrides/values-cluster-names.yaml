@@ -6,24 +6,24 @@
 
 clusterOverrides:
   primary:
-    name: ocp-p
+    name: ocp-one
     version: 4.18.7
     install_config:
       metadata:
-        name: ocp-p
+        name: ocp-one
       platform:
         aws:
           region: us-west-1
   secondary:
-    name: ocp-s
+    name: ocp-two
     version: 4.18.7
     install_config:
       metadata:
-        name: ocp-s
+        name: ocp-two
       platform:
         aws:
           region: us-east-1
 
 # DRPC overrides (preferredCluster defaults to primary if unset)
 drpc:
-  preferredCluster: ocp-p
+  preferredCluster: ocp-one
