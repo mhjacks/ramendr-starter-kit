@@ -838,16 +838,20 @@ s3StoreProfiles:
       if command -v yq &>/dev/null; then
         PK=$(echo "$VERIFIED_YAML" | yq eval '.kubeObjectProtection.s3StoreProfiles | length' 2>/dev/null || echo "0")
         PT=$(echo "$VERIFIED_YAML" | yq eval '.s3StoreProfiles | length' 2>/dev/null || echo "0")
-        PROFILE_COUNT=$(( PK >= PT ? PK : PT ))
         CK=$(echo "$VERIFIED_YAML" | yq eval '[.kubeObjectProtection.s3StoreProfiles[]? | select(has("caCertificates"))] | length' 2>/dev/null || echo "0")
         CT=$(echo "$VERIFIED_YAML" | yq eval '[.s3StoreProfiles[]? | select(has("caCertificates"))] | length' 2>/dev/null || echo "0")
+        # Normalize: yq can return "null" or empty; treat as 0
+        PK=$((10#${PK:-0})); PT=$((10#${PT:-0})); CK=$((10#${CK:-0})); CT=$((10#${CT:-0}))
+        PROFILE_COUNT=$(( PK >= PT ? PK : PT ))
         CA_CERT_COUNT=$(( CK >= CT ? CK : CT ))
       else
-        # Fallback to grep if yq is not available
+        PROFILE_COUNT=0
+        CA_CERT_COUNT=0
+      fi
+      # If yq returned 0/0 but YAML clearly has content, use grep-based counts (works regardless of yq version/parsing)
+      if [[ $PROFILE_COUNT -lt $MIN_REQUIRED_PROFILES || $CA_CERT_COUNT -lt $MIN_REQUIRED_PROFILES ]]; then
         PROFILE_COUNT=$(echo "$VERIFIED_YAML" | grep -c "s3ProfileName:" 2>/dev/null || echo "0")
-        if [[ $PROFILE_COUNT -eq 0 ]]; then
-          PROFILE_COUNT=$(echo "$VERIFIED_YAML" | grep -c "s3Bucket:" 2>/dev/null || echo "0")
-        fi
+        [[ "${PROFILE_COUNT:-0}" -eq 0 ]] && PROFILE_COUNT=$(echo "$VERIFIED_YAML" | grep -c "s3Bucket:" 2>/dev/null || echo "0")
         CA_CERT_COUNT=$(echo "$VERIFIED_YAML" | grep -c "caCertificates:" 2>/dev/null || echo "0")
       fi
       PROFILE_COUNT=$(echo "$PROFILE_COUNT" | tr -d ' \n\r' | grep -E '^[0-9]+$' || echo "0")
@@ -980,15 +984,18 @@ with open('$WORK_DIR/ramen-patch.json', 'w') as f:
               if command -v yq &>/dev/null; then
                 PK=$(echo "$VERIFIED_YAML" | yq eval '.kubeObjectProtection.s3StoreProfiles | length' 2>/dev/null || echo "0")
                 PT=$(echo "$VERIFIED_YAML" | yq eval '.s3StoreProfiles | length' 2>/dev/null || echo "0")
-                PROFILE_COUNT=$(( PK >= PT ? PK : PT ))
                 CK=$(echo "$VERIFIED_YAML" | yq eval '[.kubeObjectProtection.s3StoreProfiles[]? | select(has("caCertificates"))] | length' 2>/dev/null || echo "0")
                 CT=$(echo "$VERIFIED_YAML" | yq eval '[.s3StoreProfiles[]? | select(has("caCertificates"))] | length' 2>/dev/null || echo "0")
+                PK=$((10#${PK:-0})); PT=$((10#${PT:-0})); CK=$((10#${CK:-0})); CT=$((10#${CT:-0}))
+                PROFILE_COUNT=$(( PK >= PT ? PK : PT ))
                 CA_CERT_COUNT=$(( CK >= CT ? CK : CT ))
               else
+                PROFILE_COUNT=0
+                CA_CERT_COUNT=0
+              fi
+              if [[ $PROFILE_COUNT -lt $MIN_REQUIRED_PROFILES || $CA_CERT_COUNT -lt $MIN_REQUIRED_PROFILES ]]; then
                 PROFILE_COUNT=$(echo "$VERIFIED_YAML" | grep -c "s3ProfileName:" 2>/dev/null || echo "0")
-                if [[ $PROFILE_COUNT -eq 0 ]]; then
-                  PROFILE_COUNT=$(echo "$VERIFIED_YAML" | grep -c "s3Bucket:" 2>/dev/null || echo "0")
-                fi
+                [[ "${PROFILE_COUNT:-0}" -eq 0 ]] && PROFILE_COUNT=$(echo "$VERIFIED_YAML" | grep -c "s3Bucket:" 2>/dev/null || echo "0")
                 CA_CERT_COUNT=$(echo "$VERIFIED_YAML" | grep -c "caCertificates:" 2>/dev/null || echo "0")
               fi
               PROFILE_COUNT=$(echo "$PROFILE_COUNT" | tr -d ' \n\r' | grep -E '^[0-9]+$' || echo "0")
@@ -1332,23 +1339,23 @@ if echo "$FINAL_VERIFIED_YAML" | grep -q "s3StoreProfiles"; then
   if command -v yq &>/dev/null; then
     PK=$(echo "$FINAL_VERIFIED_YAML" | yq eval '.kubeObjectProtection.s3StoreProfiles | length' 2>/dev/null || echo "0")
     PT=$(echo "$FINAL_VERIFIED_YAML" | yq eval '.s3StoreProfiles | length' 2>/dev/null || echo "0")
-    FINAL_PROFILE_COUNT=$(( PK >= PT ? PK : PT ))
     CK=$(echo "$FINAL_VERIFIED_YAML" | yq eval '[.kubeObjectProtection.s3StoreProfiles[]? | select(has("caCertificates"))] | length' 2>/dev/null || echo "0")
     CT=$(echo "$FINAL_VERIFIED_YAML" | yq eval '[.s3StoreProfiles[]? | select(has("caCertificates"))] | length' 2>/dev/null || echo "0")
+    PK=$((10#${PK:-0})); PT=$((10#${PT:-0})); CK=$((10#${CK:-0})); CT=$((10#${CT:-0}))
+    FINAL_PROFILE_COUNT=$(( PK >= PT ? PK : PT ))
     FINAL_CA_CERT_COUNT=$(( CK >= CT ? CK : CT ))
   else
+    FINAL_PROFILE_COUNT=0
+    FINAL_CA_CERT_COUNT=0
+  fi
+  if [[ $FINAL_PROFILE_COUNT -lt $MIN_REQUIRED_PROFILES || $FINAL_CA_CERT_COUNT -lt $MIN_REQUIRED_PROFILES ]]; then
     FINAL_PROFILE_COUNT=$(echo "$FINAL_VERIFIED_YAML" | grep -c "s3ProfileName:" 2>/dev/null || echo "0")
-    if [[ $FINAL_PROFILE_COUNT -eq 0 ]]; then
-      FINAL_PROFILE_COUNT=$(echo "$FINAL_VERIFIED_YAML" | grep -c "s3Bucket:" 2>/dev/null || echo "0")
-    fi
+    [[ "${FINAL_PROFILE_COUNT:-0}" -eq 0 ]] && FINAL_PROFILE_COUNT=$(echo "$FINAL_VERIFIED_YAML" | grep -c "s3Bucket:" 2>/dev/null || echo "0")
     FINAL_CA_CERT_COUNT=$(echo "$FINAL_VERIFIED_YAML" | grep -c "caCertificates:" 2>/dev/null || echo "0")
   fi
-  
   # Remove any whitespace/newlines and ensure numeric
   FINAL_PROFILE_COUNT=$(echo "$FINAL_PROFILE_COUNT" | tr -d ' \n\r' | grep -E '^[0-9]+$' || echo "0")
   FINAL_CA_CERT_COUNT=$(echo "$FINAL_CA_CERT_COUNT" | tr -d ' \n\r' | grep -E '^[0-9]+$' || echo "0")
-  
-  # Force to integer (remove leading zeros)
   FINAL_PROFILE_COUNT=$((10#$FINAL_PROFILE_COUNT))
   FINAL_CA_CERT_COUNT=$((10#$FINAL_CA_CERT_COUNT))
   
