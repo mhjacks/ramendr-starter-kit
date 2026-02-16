@@ -2,6 +2,10 @@
 # Minimal override for DR cluster names, versions, and regions.
 # Merge this BEFORE rdr/values (e.g. -f overrides/values-cluster-names.yaml -f charts/hub/rdr/values.yaml)
 # so full regionalDR comes from the chart and this only overlays clusterOverrides.
+
+# DRPC preferred cluster (defaults to primary if unset)
+preferredCluster: ocp-primary
+
 clusterOverrides:
   primary:
     name: ocp-primary

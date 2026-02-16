@@ -32,3 +32,8 @@
 {{- $dr := index .Values.regionalDR 0 -}}
 {{- index (index (.Values.clusterOverrides | default dict) "secondary" | default dict) "name" | default $dr.clusters.secondary.name -}}
 {{- end -}}
+
+{{/* Preferred cluster for DRPC (default: primary). Override via values.preferredCluster. */}}
+{{- define "rdr.preferredClusterName" -}}
+{{- .Values.preferredCluster | default (include "rdr.primaryClusterName" .) -}}
+{{- end -}}
