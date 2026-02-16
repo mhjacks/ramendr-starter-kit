@@ -1320,27 +1320,32 @@ if [[ -z "$FINAL_VERIFIED_YAML" ]]; then
   handle_error "ramen-hub-operator-config ConfigMap is missing or empty - CA material not configured"
 fi
 
+# Write to file to avoid ARG_MAX when content is large (big base64 certs); grep/yq on file are reliable
+FINAL_VERIFIED_FILE="${WORK_DIR:-/tmp/odf-ssl-certs}/final_verified_ramen.yaml"
+mkdir -p "$(dirname "$FINAL_VERIFIED_FILE")"
+printf '%s' "$FINAL_VERIFIED_YAML" > "$FINAL_VERIFIED_FILE"
+
 FINAL_VERIFICATION_PASSED=true
 FINAL_VERIFICATION_ERRORS=()
 
-if ! echo "$FINAL_VERIFIED_YAML" | grep -q "s3StoreProfiles"; then
+if ! grep -q "s3StoreProfiles" "$FINAL_VERIFIED_FILE" 2>/dev/null; then
   FINAL_VERIFICATION_PASSED=false
   FINAL_VERIFICATION_ERRORS+=("s3StoreProfiles not found in final verification")
 fi
 
-if ! echo "$FINAL_VERIFIED_YAML" | grep -q "caCertificates"; then
+if ! grep -q "caCertificates" "$FINAL_VERIFIED_FILE" 2>/dev/null; then
   FINAL_VERIFICATION_PASSED=false
   FINAL_VERIFICATION_ERRORS+=("caCertificates not found in final verification")
 fi
 
 # Verify structure: s3StoreProfiles under kubeObjectProtection or at top level (match script output)
 MIN_REQUIRED_PROFILES=2
-if echo "$FINAL_VERIFIED_YAML" | grep -q "s3StoreProfiles"; then
+if grep -q "s3StoreProfiles" "$FINAL_VERIFIED_FILE" 2>/dev/null; then
   if command -v yq &>/dev/null; then
-    PK=$(echo "$FINAL_VERIFIED_YAML" | yq eval '.kubeObjectProtection.s3StoreProfiles | length' 2>/dev/null || echo "0")
-    PT=$(echo "$FINAL_VERIFIED_YAML" | yq eval '.s3StoreProfiles | length' 2>/dev/null || echo "0")
-    CK=$(echo "$FINAL_VERIFIED_YAML" | yq eval '[.kubeObjectProtection.s3StoreProfiles[]? | select(has("caCertificates"))] | length' 2>/dev/null || echo "0")
-    CT=$(echo "$FINAL_VERIFIED_YAML" | yq eval '[.s3StoreProfiles[]? | select(has("caCertificates"))] | length' 2>/dev/null || echo "0")
+    PK=$(yq eval '.kubeObjectProtection.s3StoreProfiles | length' "$FINAL_VERIFIED_FILE" 2>/dev/null || echo "0")
+    PT=$(yq eval '.s3StoreProfiles | length' "$FINAL_VERIFIED_FILE" 2>/dev/null || echo "0")
+    CK=$(yq eval '[.kubeObjectProtection.s3StoreProfiles[]? | select(has("caCertificates"))] | length' "$FINAL_VERIFIED_FILE" 2>/dev/null || echo "0")
+    CT=$(yq eval '[.s3StoreProfiles[]? | select(has("caCertificates"))] | length' "$FINAL_VERIFIED_FILE" 2>/dev/null || echo "0")
     PK=$((10#${PK:-0})); PT=$((10#${PT:-0})); CK=$((10#${CK:-0})); CT=$((10#${CT:-0}))
     FINAL_PROFILE_COUNT=$(( PK >= PT ? PK : PT ))
     FINAL_CA_CERT_COUNT=$(( CK >= CT ? CK : CT ))
@@ -1349,9 +1354,9 @@ if echo "$FINAL_VERIFIED_YAML" | grep -q "s3StoreProfiles"; then
     FINAL_CA_CERT_COUNT=0
   fi
   if [[ $FINAL_PROFILE_COUNT -lt $MIN_REQUIRED_PROFILES || $FINAL_CA_CERT_COUNT -lt $MIN_REQUIRED_PROFILES ]]; then
-    FINAL_PROFILE_COUNT=$(echo "$FINAL_VERIFIED_YAML" | grep -c "s3ProfileName:" 2>/dev/null || echo "0")
-    [[ "${FINAL_PROFILE_COUNT:-0}" -eq 0 ]] && FINAL_PROFILE_COUNT=$(echo "$FINAL_VERIFIED_YAML" | grep -c "s3Bucket:" 2>/dev/null || echo "0")
-    FINAL_CA_CERT_COUNT=$(echo "$FINAL_VERIFIED_YAML" | grep -c "caCertificates:" 2>/dev/null || echo "0")
+    FINAL_PROFILE_COUNT=$(grep -c "s3ProfileName:" "$FINAL_VERIFIED_FILE" 2>/dev/null || echo "0")
+    [[ "${FINAL_PROFILE_COUNT:-0}" -eq 0 ]] && FINAL_PROFILE_COUNT=$(grep -c "s3Bucket:" "$FINAL_VERIFIED_FILE" 2>/dev/null || echo "0")
+    FINAL_CA_CERT_COUNT=$(grep -c "caCertificates:" "$FINAL_VERIFIED_FILE" 2>/dev/null || echo "0")
   fi
   # Remove any whitespace/newlines and ensure numeric
   FINAL_PROFILE_COUNT=$(echo "$FINAL_PROFILE_COUNT" | tr -d ' \n\r' | grep -E '^[0-9]+$' || echo "0")
@@ -1425,7 +1430,7 @@ if [[ "$FINAL_VERIFICATION_PASSED" != "true" ]]; then
     echo "     - $error"
   done
   echo "     Current ConfigMap YAML content:"
-  echo "$FINAL_VERIFIED_YAML"
+  cat "$FINAL_VERIFIED_FILE"
   echo ""
   if [[ $FINAL_PROFILE_COUNT -eq 0 ]]; then
     echo "     s3StoreProfiles is empty ([]). Configure at least 2 S3 store profiles in ramen-hub-operator-config"
