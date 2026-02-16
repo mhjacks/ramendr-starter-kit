@@ -172,5 +172,5 @@ clusterGroup:
         - name: clusterGroup.isHubCluster
           value: "false"
       acmlabels:
-        - name: cluster.open-cluster-management.io/clusterset
+        - name: clusterGroup
           value: resilient

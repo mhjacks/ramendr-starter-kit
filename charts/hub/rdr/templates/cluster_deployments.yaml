@@ -120,7 +120,7 @@ metadata:
     purpose: regionalDR
     vendor: OpenShift
     cluster.open-cluster-management.io/clusterset: {{ $clusterSet }}
-    clusterGroup: {{ $cluster.clusterGroup }}
+    clusterGroup: {{ $cluster.clusterGroup | default $clusterSet }}
   annotations:
     argocd.argoproj.io/sync-wave: "1"
 spec:
@@ -152,7 +152,7 @@ metadata:
     name: {{ $cluster.name }}
     vendor: OpenShift
     cluster.open-cluster-management.io/clusterset: {{ $clusterSet }}
-    clusterGroup: {{ $cluster.clusterGroup }}
+    clusterGroup: {{ $cluster.clusterGroup | default $clusterSet }}
     purpose: regionalDR
   name: {{ $cluster.name }}
   annotations:
@@ -175,7 +175,7 @@ spec:
     vendor: OpenShift
     cluster.open-cluster-management.io/clusterset: {{ $clusterSet }}
     purpose: regionalDR
-    clusterGroup: {{ $cluster.clusterGroup }}
+    clusterGroup: {{ $cluster.clusterGroup | default $clusterSet }}
   applicationManager:
     enabled: true
   policyController:

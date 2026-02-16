@@ -25,7 +25,8 @@
 {{- $installConfigSafe := fromJson (include "rdr.sanitizeInstallConfig" $installConfig) -}}
 {{- $defaultBaseDomain := join "." (slice (splitList "." (.Values.global.clusterDomain | default "cluster.example.com")) 1) -}}
 {{- $installConfigWithBase := merge $installConfigSafe (dict "baseDomain" (default $defaultBaseDomain (index $installConfigSafe "baseDomain"))) -}}
-{{- dict "name" (index $over "name" | default $base.name) "version" (index $over "version" | default $base.version) "clusterGroup" $base.clusterGroup "install_config" $installConfigWithBase | toJson -}}
+{{- $clusterGroup := index $over "clusterGroup" | default $base.clusterGroup | default $dr.name -}}
+{{- dict "name" (index $over "name" | default $base.name) "version" (index $over "version" | default $base.version) "clusterGroup" $clusterGroup "install_config" $installConfigWithBase | toJson -}}
 {{- end -}}
 
 {{/*
@@ -39,7 +40,8 @@
 {{- $installConfigSafe := fromJson (include "rdr.sanitizeInstallConfig" $installConfig) -}}
 {{- $defaultBaseDomain := join "." (slice (splitList "." (.Values.global.clusterDomain | default "cluster.example.com")) 1) -}}
 {{- $installConfigWithBase := merge $installConfigSafe (dict "baseDomain" (default $defaultBaseDomain (index $installConfigSafe "baseDomain"))) -}}
-{{- dict "name" (index $over "name" | default $base.name) "version" (index $over "version" | default $base.version) "clusterGroup" $base.clusterGroup "install_config" $installConfigWithBase | toJson -}}
+{{- $clusterGroup := index $over "clusterGroup" | default $base.clusterGroup | default $dr.name -}}
+{{- dict "name" (index $over "name" | default $base.name) "version" (index $over "version" | default $base.version) "clusterGroup" $clusterGroup "install_config" $installConfigWithBase | toJson -}}
 {{- end -}}
 
 {{/* Primary cluster name for use in drpc, jobs, etc. */}}
