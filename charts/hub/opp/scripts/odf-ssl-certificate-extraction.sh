@@ -455,13 +455,15 @@ if oc get configmap ramen-hub-operator-config -n openshift-operators &>/dev/null
   EXISTING_YAML=$(oc get configmap ramen-hub-operator-config -n openshift-operators -o jsonpath='{.data.ramen_manager_config\.yaml}' 2>/dev/null || echo "")
   
   # CRITICAL: Verify at least 2 S3profiles exist before attempting update
+  # RamenConfig may have s3StoreProfiles at top level OR under kubeObjectProtection
   MIN_REQUIRED_PROFILES=2
   if [[ -n "$EXISTING_YAML" ]]; then
-    # Use yq to properly parse YAML and count profiles
     if command -v yq &>/dev/null; then
       EXISTING_PROFILE_COUNT=$(echo "$EXISTING_YAML" | yq eval '.s3StoreProfiles | length' 2>/dev/null || echo "0")
+      if [[ "${EXISTING_PROFILE_COUNT:-0}" -lt $MIN_REQUIRED_PROFILES ]]; then
+        EXISTING_PROFILE_COUNT=$(echo "$EXISTING_YAML" | yq eval '.kubeObjectProtection.s3StoreProfiles | length' 2>/dev/null || echo "0")
+      fi
     else
-      # Fallback to grep if yq is not available
       EXISTING_PROFILE_COUNT=$(echo "$EXISTING_YAML" | grep -c "s3ProfileName:" 2>/dev/null || echo "0")
       if [[ $EXISTING_PROFILE_COUNT -eq 0 ]]; then
         EXISTING_PROFILE_COUNT=$(echo "$EXISTING_YAML" | grep -c "s3Bucket:" 2>/dev/null || echo "0")
@@ -507,6 +509,16 @@ import os
 
 ca_bundle = os.environ.get('CA_BUNDLE_BASE64', '')
 
+def update_profiles(profiles):
+    count = 0
+    if not profiles:
+        return count
+    for profile in profiles:
+        if isinstance(profile, dict):
+            profile['caCertificates'] = ca_bundle
+            count += 1
+    return count
+
 try:
     with open('$WORK_DIR/existing-ramen-config.yaml', 'r') as f:
         config = yaml.safe_load(f) or {}
@@ -514,14 +526,16 @@ try:
     if config is None:
         config = {}
     
-    if 's3StoreProfiles' not in config:
-        config['s3StoreProfiles'] = []
-    
     updated_count = 0
-    for profile in config.get('s3StoreProfiles', []):
-        if isinstance(profile, dict):
-            profile['caCertificates'] = ca_bundle
-            updated_count += 1
+    # Top-level s3StoreProfiles (some Ramen versions)
+    if 's3StoreProfiles' in config and config['s3StoreProfiles']:
+        updated_count += update_profiles(config['s3StoreProfiles'])
+    # kubeObjectProtection.s3StoreProfiles (RamenConfig structure)
+    if 'kubeObjectProtection' not in config:
+        config['kubeObjectProtection'] = {}
+    kop = config['kubeObjectProtection']
+    if isinstance(kop, dict) and 's3StoreProfiles' in kop and kop['s3StoreProfiles']:
+        updated_count += update_profiles(kop['s3StoreProfiles'])
     
     print(f'Updated {updated_count} s3StoreProfiles with caCertificates', file=sys.stderr)
     
@@ -543,11 +557,17 @@ except Exception as e:
       fi
     fi
     
-    # Method 2: Try yq if Python failed
+    # Method 2: Try yq if Python failed (support top-level and kubeObjectProtection.s3StoreProfiles)
     if [[ "$PYTHON_SUCCESS" != "true" ]] && command -v yq &>/dev/null; then
       echo "  Using yq to update s3StoreProfiles..."
-      # Use yq to update each profile individually
-      if yq eval '(.s3StoreProfiles[] | select(has("name"))) |= . + {"caCertificates": "'"$CA_BUNDLE_BASE64"'"}' -i "$WORK_DIR/existing-ramen-config.yaml" 2>&1; then
+      YQ_UPDATED=false
+      if yq eval '(.s3StoreProfiles[]? | select(has("name") or has("s3ProfileName"))) |= . + {"caCertificates": "'"$CA_BUNDLE_BASE64"'"}' -i "$WORK_DIR/existing-ramen-config.yaml" 2>/dev/null; then
+        YQ_UPDATED=true
+      fi
+      if yq eval '(.kubeObjectProtection.s3StoreProfiles[]? | select(has("name") or has("s3ProfileName"))) |= . + {"caCertificates": "'"$CA_BUNDLE_BASE64"'"}' -i "$WORK_DIR/existing-ramen-config.yaml" 2>/dev/null; then
+        YQ_UPDATED=true
+      fi
+      if [[ "$YQ_UPDATED" == "true" ]]; then
         echo "  ✅ Successfully updated s3StoreProfiles with caCertificates using yq"
         PYTHON_SUCCESS=true
       else
@@ -685,9 +705,9 @@ if 'metadata' in cm:
     cm['metadata'].pop('resourceVersion', None)
     cm['metadata'].pop('managedFields', None)
 
-# Write back
+# Write back (width=4096 helps PyYAML use block style for long config string)
 with open('$WORK_DIR/ramen-configmap-updated.yaml', 'w') as f:
-    yaml.dump(cm, f, default_flow_style=False, sort_keys=False, allow_unicode=True)
+    yaml.dump(cm, f, default_flow_style=False, sort_keys=False, allow_unicode=True, width=4096)
 " 2>/dev/null
       }
     else
@@ -718,10 +738,29 @@ if 'metadata' in cm:
 
 # Write back
 with open('$WORK_DIR/ramen-configmap-updated.yaml', 'w') as f:
-    yaml.dump(cm, f, default_flow_style=False, sort_keys=False, allow_unicode=True)
+    yaml.dump(cm, f, default_flow_style=False, sort_keys=False, allow_unicode=True, width=4096)
 " 2>/dev/null
     fi
-    
+
+    # If manifest still missing (yq/Python failed), build it with literal block for config data
+    if [[ ! -f "$WORK_DIR/ramen-configmap-updated.yaml" ]]; then
+      echo "  Building ConfigMap manifest using literal block for config data..."
+      METADATA_NAMESPACE=$(grep -E '^\s+namespace:' "$WORK_DIR/ramen-configmap-template.yaml" | head -1 | sed 's/.*namespace:[[:space:]]*//')
+      METADATA_NAME=$(grep -E '^\s+name:' "$WORK_DIR/ramen-configmap-template.yaml" | head -1 | sed 's/.*name:[[:space:]]*//')
+      [[ -z "$METADATA_NAMESPACE" ]] && METADATA_NAMESPACE=openshift-operators
+      [[ -z "$METADATA_NAME" ]] && METADATA_NAME=ramen-hub-operator-config
+      {
+        echo "apiVersion: v1"
+        echo "kind: ConfigMap"
+        echo "metadata:"
+        echo "  name: $METADATA_NAME"
+        echo "  namespace: $METADATA_NAMESPACE"
+        echo "data:"
+        echo "  ramen_manager_config.yaml: |"
+        sed 's/^/    /' "$WORK_DIR/ramen_manager_config.yaml"
+      } > "$WORK_DIR/ramen-configmap-updated.yaml"
+    fi
+
     if [[ -f "$WORK_DIR/ramen-configmap-updated.yaml" ]]; then
       echo "  Applying updated ConfigMap..."
       UPDATE_OUTPUT=$(oc apply -f "$WORK_DIR/ramen-configmap-updated.yaml" 2>&1)
@@ -768,14 +807,16 @@ with open('$WORK_DIR/ramen-configmap-updated.yaml', 'w') as f:
     fi
     
     # Additional check: verify that each s3StoreProfiles item has caCertificates
-    # CRITICAL: Must find at least 2 S3profiles
+    # RamenConfig may have s3StoreProfiles at top level OR under kubeObjectProtection
     MIN_REQUIRED_PROFILES=2
     if echo "$VERIFIED_YAML" | grep -q "s3StoreProfiles"; then
-      # Use yq to properly parse YAML and count profiles
       if command -v yq &>/dev/null; then
         PROFILE_COUNT=$(echo "$VERIFIED_YAML" | yq eval '.s3StoreProfiles | length' 2>/dev/null || echo "0")
-        # Count profiles that have caCertificates field
-        CA_CERT_COUNT=$(echo "$VERIFIED_YAML" | yq eval '[.s3StoreProfiles[] | select(has("caCertificates"))] | length' 2>/dev/null || echo "0")
+        CA_CERT_COUNT=$(echo "$VERIFIED_YAML" | yq eval '[.s3StoreProfiles[]? | select(has("caCertificates"))] | length' 2>/dev/null || echo "0")
+        if [[ "${PROFILE_COUNT:-0}" -lt $MIN_REQUIRED_PROFILES ]]; then
+          PROFILE_COUNT=$(echo "$VERIFIED_YAML" | yq eval '.kubeObjectProtection.s3StoreProfiles | length' 2>/dev/null || echo "0")
+          CA_CERT_COUNT=$(echo "$VERIFIED_YAML" | yq eval '[.kubeObjectProtection.s3StoreProfiles[]? | select(has("caCertificates"))] | length' 2>/dev/null || echo "0")
+        fi
       else
         # Fallback to grep if yq is not available
         PROFILE_COUNT=$(echo "$VERIFIED_YAML" | grep -c "s3ProfileName:" 2>/dev/null || echo "0")
@@ -917,13 +958,14 @@ with open('$WORK_DIR/ramen-patch.json', 'w') as f:
             # CRITICAL: Must find at least 2 S3profiles
             MIN_REQUIRED_PROFILES=2
             if echo "$VERIFIED_YAML" | grep -q "s3StoreProfiles"; then
-              # Use yq to properly parse YAML and count profiles
               if command -v yq &>/dev/null; then
                 PROFILE_COUNT=$(echo "$VERIFIED_YAML" | yq eval '.s3StoreProfiles | length' 2>/dev/null || echo "0")
-                # Count profiles that have caCertificates field
-                CA_CERT_COUNT=$(echo "$VERIFIED_YAML" | yq eval '[.s3StoreProfiles[] | select(has("caCertificates"))] | length' 2>/dev/null || echo "0")
+                CA_CERT_COUNT=$(echo "$VERIFIED_YAML" | yq eval '[.s3StoreProfiles[]? | select(has("caCertificates"))] | length' 2>/dev/null || echo "0")
+                if [[ "${PROFILE_COUNT:-0}" -lt $MIN_REQUIRED_PROFILES ]]; then
+                  PROFILE_COUNT=$(echo "$VERIFIED_YAML" | yq eval '.kubeObjectProtection.s3StoreProfiles | length' 2>/dev/null || echo "0")
+                  CA_CERT_COUNT=$(echo "$VERIFIED_YAML" | yq eval '[.kubeObjectProtection.s3StoreProfiles[]? | select(has("caCertificates"))] | length' 2>/dev/null || echo "0")
+                fi
               else
-                # Fallback to grep if yq is not available
                 PROFILE_COUNT=$(echo "$VERIFIED_YAML" | grep -c "s3ProfileName:" 2>/dev/null || echo "0")
                 if [[ $PROFILE_COUNT -eq 0 ]]; then
                   PROFILE_COUNT=$(echo "$VERIFIED_YAML" | grep -c "s3Bucket:" 2>/dev/null || echo "0")
