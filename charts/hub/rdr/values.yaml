@@ -47,6 +47,7 @@ drpc:
         operator: In
         values:
           - storage
+  preferredCluster: ocp-primary  # default; override in values-cluster-names or values
 
 regionalDR:
   - name: resilient # Matches with ClusterSet

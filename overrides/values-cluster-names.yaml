@@ -1,11 +1,8 @@
 ---
 # Minimal override for DR cluster names, versions, and regions.
-# Merge this BEFORE rdr/values (e.g. -f overrides/values-cluster-names.yaml -f charts/hub/rdr/values.yaml)
-# so full regionalDR comes from the chart and this only overlays clusterOverrides.
-
-# DRPC: preferred cluster (defaults to primary if unset). Other drpc.* fields (name, namespace,
-# drPolicyRef.name, placementRef, protectedNamespaces, pvcSelector, etc.) use chart defaults.
-preferredCluster: ocp-primary
+# This file is applied after chart defaults (override merged last). It only contains overlay keys
+# (clusterOverrides, drpc) so chart regionalDR defaults are preserved.
+# Also works if merged first: -f overrides/values-cluster-names.yaml -f charts/hub/rdr/values.yaml
 
 clusterOverrides:
   primary:
@@ -26,3 +23,7 @@ clusterOverrides:
       platform:
         aws:
           region: us-east-1
+
+# DRPC overrides (preferredCluster defaults to primary if unset)
+drpc:
+  preferredCluster: ocp-primary
