@@ -2,8 +2,11 @@
 {{- $clusterSet := $dr.name }}
 {{- $effectivePrimary := include "rdr.effectivePrimaryCluster" . | fromJson }}
 {{- $effectiveSecondary := include "rdr.effectiveSecondaryCluster" . | fromJson }}
+{{- $defaultBaseDomain := join "." (slice (splitList "." (.Values.global.clusterDomain | default "cluster.example.com")) 1) }}
 {{- range list $effectivePrimary $effectiveSecondary }}
 {{- $cluster := . }}
+{{- $baseDomainRaw := index $cluster.install_config "baseDomain" }}
+{{- $baseDomainStr := default $defaultBaseDomain (and (kindIs "string" $baseDomainRaw) $baseDomainRaw) }}
 ---
 apiVersion: v1
 kind: Namespace
@@ -106,7 +109,7 @@ data:
   install-config.yaml: {{ tpl $install_config $ | b64enc }}
 
 ---
-{{- $domainLabels := splitList "." (tpl $cluster.install_config.baseDomain $) }}
+{{- $domainLabels := splitList "." (tpl $baseDomainStr $) }}
 {{- $baseDomain := join "." (slice $domainLabels 1) }}
 apiVersion: hive.openshift.io/v1
 kind: ClusterDeployment
