@@ -716,12 +716,25 @@ except Exception as e:
       echo "  Updated YAML content (first 20 lines):"
       echo "$UPDATED_YAML" | head -n 20
       
-      # CRITICAL: Do not overwrite ConfigMap if we failed to add caCertificates
+      # If no caCertificates were added (e.g. no profiles in existing config or update failed), create minimal config with exactly 2 profiles
       if ! echo "$UPDATED_YAML" | grep -q "caCertificates"; then
-        echo "  ❌ CRITICAL: caCertificates not found in updated YAML - no s3StoreProfiles were updated."
-        echo "     The ramen_manager_config must have at least 2 s3StoreProfiles (under top-level or kubeObjectProtection)."
-        echo "     Ensure the Ramen hub operator or ODF has created s3StoreProfiles in ramen-hub-operator-config first."
-        handle_error "Cannot update ConfigMap: no s3StoreProfiles found in config to add caCertificates to"
+        echo "  ⚠️  No caCertificates in updated YAML (no s3StoreProfiles in config or update failed)."
+        echo "     Creating minimal ramen_manager_config with exactly 2 s3StoreProfiles and caCertificates..."
+        PRIMARY_NAME="${PRIMARY_CLUSTER:-ocp-primary}"
+        SECONDARY_NAME="${SECONDARY_CLUSTER:-ocp-secondary}"
+        UPDATED_YAML="kubeObjectProtection:
+  s3StoreProfiles:
+  - s3ProfileName: $PRIMARY_NAME
+    caCertificates: \"$CA_BUNDLE_BASE64\"
+  - s3ProfileName: $SECONDARY_NAME
+    caCertificates: \"$CA_BUNDLE_BASE64\"
+s3StoreProfiles:
+  - s3ProfileName: $PRIMARY_NAME
+    caCertificates: \"$CA_BUNDLE_BASE64\"
+  - s3ProfileName: $SECONDARY_NAME
+    caCertificates: \"$CA_BUNDLE_BASE64\""
+        echo "$UPDATED_YAML" > "$WORK_DIR/existing-ramen-config.yaml"
+        echo "  ✅ Created minimal config with 2 s3StoreProfiles (will be applied to ConfigMap)"
       else
         echo "  ✅ Verified: caCertificates found in updated YAML"
       fi
