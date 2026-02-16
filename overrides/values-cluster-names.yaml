@@ -3,7 +3,8 @@
 # Merge this BEFORE rdr/values (e.g. -f overrides/values-cluster-names.yaml -f charts/hub/rdr/values.yaml)
 # so full regionalDR comes from the chart and this only overlays clusterOverrides.
 
-# DRPC preferred cluster (defaults to primary if unset)
+# DRPC: preferred cluster (defaults to primary if unset). Other drpc.* fields (name, namespace,
+# drPolicyRef.name, placementRef, protectedNamespaces, pvcSelector, etc.) use chart defaults.
 preferredCluster: ocp-primary
 
 clusterOverrides:
