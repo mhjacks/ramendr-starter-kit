@@ -6,6 +6,22 @@ global:
 edgeGitopsVms:
   chartVersion: "0.2.10"
 
+# Minimal overrides for cluster names, versions, regions (e.g. overrides/values-cluster-names.yaml).
+# Merge override file FIRST so full regionalDR stays here and only clusterOverrides are applied.
+# clusterOverrides:
+#   primary:
+#     name: ocp-primary
+#     version: 4.18.7
+#     install_config:
+#       metadata:
+#         name: ocp-primary
+#       platform:
+#         aws:
+#           region: us-west-1
+#   secondary:
+#     name: ocp-secondary
+#     ...
+
 regionalDR:
   - name: resilient # Matches with ClusterSet
     globalnetEnabled: false # Support for overlapping CIDR

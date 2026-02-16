@@ -1,7 +1,9 @@
-{{- range .Values.regionalDR }}
-{{ $clusterSet := .name }}
-{{- range list .clusters.primary .clusters.secondary }}
-{{ $cluster := . }}
+{{- $dr := index .Values.regionalDR 0 }}
+{{- $clusterSet := $dr.name }}
+{{- $effectivePrimary := include "rdr.effectivePrimaryCluster" . | fromJson }}
+{{- $effectiveSecondary := include "rdr.effectiveSecondaryCluster" . | fromJson }}
+{{- range list $effectivePrimary $effectiveSecondary }}
+{{- $cluster := . }}
 ---
 apiVersion: v1
 kind: Namespace
@@ -177,5 +179,4 @@ spec:
     enabled: true
   iamPolicyController:
     enabled: true
-{{- end }}
 {{- end }}

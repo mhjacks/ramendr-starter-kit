@@ -1,88 +1,23 @@
 ---
-# Override DR pair cluster names - full regionalDR structure so rdr chart still renders
-# when this file is merged last. Edit primary.name, secondary.name (and install_config.metadata.name
-# for each) to use custom names (e.g. ocp-p, ocp-s). Same structure as charts/hub/rdr/values.yaml.
-regionalDR:
-  - name: resilient
-    globalnetEnabled: false
-    clusters:
-      primary:
+# Minimal override for DR cluster names, versions, and regions.
+# Merge this BEFORE rdr/values (e.g. -f overrides/values-cluster-names.yaml -f charts/hub/rdr/values.yaml)
+# so full regionalDR comes from the chart and this only overlays clusterOverrides.
+clusterOverrides:
+  primary:
+    name: ocp-primary
+    version: 4.18.7
+    install_config:
+      metadata:
         name: ocp-primary
-        clusterGroup: resilient
-        version: 4.18.7
-        install_config:
-          apiVersion: v1
-          baseDomain: "{{ join \".\" (slice (splitList \".\" $.Values.global.clusterDomain) 1) }}"
-          metadata:
-            name: ocp-primary
-          controlPlane:
-            name: master
-            replicas: 3
-            platform:
-              aws:
-                type: m5.4xlarge
-          compute:
-            - name: worker
-              replicas: 3
-              platform:
-                aws:
-                  type: m5.metal
-          networking:
-            clusterNetwork:
-              - cidr: 10.132.0.0/14
-                hostPrefix: 23
-            machineNetwork:
-              - cidr: 10.1.0.0/16
-            networkType: OVNKubernetes
-            serviceNetwork:
-              - 172.20.0.0/16
-          platform:
-            aws:
-              region: us-west-1
-              userTags:
-                project: ValidatedPatterns
-          publish: External
-          sshKey: ""
-          pullSecret: ""
-      secondary:
+      platform:
+        aws:
+          region: us-west-1
+  secondary:
+    name: ocp-secondary
+    version: 4.18.7
+    install_config:
+      metadata:
         name: ocp-secondary
-        clusterGroup: resilient
-        version: 4.18.7
-        install_config:
-          apiVersion: v1
-          baseDomain: "{{ join \".\" (slice (splitList \".\" $.Values.global.clusterDomain) 1) }}"
-          metadata:
-            name: ocp-secondary
-          controlPlane:
-            name: master
-            replicas: 3
-            platform:
-              aws:
-                type: m5.4xlarge
-          compute:
-            - name: worker
-              replicas: 3
-              platform:
-                aws:
-                  type: m5.metal
-          networking:
-            clusterNetwork:
-              - cidr: 10.136.0.0/14
-                hostPrefix: 23
-            machineNetwork:
-              - cidr: 10.2.0.0/16
-            networkType: OVNKubernetes
-            serviceNetwork:
-              - 172.21.0.0/16
-          platform:
-            aws:
-              region: us-east-1
-              userTags:
-                project: ValidatedPatterns
-          publish: External
-          sshKey: ""
-          pullSecret: ""
-    drpolicies:
-      - interval: 2m
-        vmSupport: true
-      - interval: 2m
+      platform:
+        aws:
+          region: us-east-1

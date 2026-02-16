@@ -27,9 +27,9 @@ spec:
             image: registry.redhat.io/openshift4/ose-cli:latest
             env:
             - name: PRIMARY_CLUSTER
-              value: {{ if and .Values.regionalDR (index .Values.regionalDR 0) }}{{ (index .Values.regionalDR 0).clusters.primary.name | default "ocp-primary" | quote }}{{ else }}"ocp-primary"{{ end }}
+              value: {{ include "opp.primaryClusterName" . | quote }}
             - name: SECONDARY_CLUSTER
-              value: {{ if and .Values.regionalDR (index .Values.regionalDR 0) }}{{ (index .Values.regionalDR 0).clusters.secondary.name | default "ocp-secondary" | quote }}{{ else }}"ocp-secondary"{{ end }}
+              value: {{ include "opp.secondaryClusterName" . | quote }}
             command:
             - /bin/bash
             - -c

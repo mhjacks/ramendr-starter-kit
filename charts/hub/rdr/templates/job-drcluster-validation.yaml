@@ -34,9 +34,9 @@ spec:
           
           echo "Starting DRCluster validation check..."
           
-          # Configuration (from regionalDR - same structure as rdr chart)
-          PRIMARY_CLUSTER="{{ (index $.Values.regionalDR 0).clusters.primary.name }}"
-          SECONDARY_CLUSTER="{{ (index $.Values.regionalDR 0).clusters.secondary.name }}"
+          # Configuration (clusterOverrides or regionalDR)
+          PRIMARY_CLUSTER="{{ include "rdr.primaryClusterName" $ }}"
+          SECONDARY_CLUSTER="{{ include "rdr.secondaryClusterName" $ }}"
           DRPOLICY_NAME="{{ $name }}"
           MAX_ATTEMPTS=120  # 2 hours with 1 minute intervals
           SLEEP_INTERVAL=60  # 1 minute between checks
