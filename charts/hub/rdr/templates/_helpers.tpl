@@ -49,6 +49,10 @@
 {{- $over := index (.Values.clusterOverrides | default dict) "primary" | default dict -}}
 {{- $base := $dr.clusters.primary -}}
 {{- $baseIC := $base.install_config | default dict -}}
+{{- /* When values-hub (or similar) replaces regionalDR with minimal structure, base has no install_config; use chart default */ -}}
+{{- if and (index . "Files") (not (hasKey $baseIC "controlPlane")) -}}
+{{- $baseIC = fromJson ((index . "Files").Get "files/default-primary-install-config.json") | default dict -}}
+{{- end -}}
 {{- $overIC := index . "primaryOverrideInstallConfig" | default $over.install_config | default dict -}}
 {{- /* Shallow merge: over wins. Deep-merge metadata, platform.aws, controlPlane, compute so over wins but base keeps machine types when over is partial. */ -}}
 {{- $merged := merge $overIC $baseIC -}}
@@ -79,7 +83,7 @@
 {{- $installConfig := merge $merged (dict "compute" $computeFinal) -}}
 {{- $installConfigSafe := fromJson (include "rdr.sanitizeInstallConfig" $installConfig) -}}
 {{- $defaultBaseDomain := join "." (slice (splitList "." (.Values.global.clusterDomain | default "cluster.example.com")) 1) -}}
-{{- $installConfigWithBase := merge $installConfigSafe (dict "baseDomain" (default $defaultBaseDomain (index $installConfigSafe "baseDomain"))) -}}
+{{- $installConfigWithBase := merge $installConfigSafe (dict "baseDomain" ($defaultBaseDomain | default (index $installConfigSafe "baseDomain"))) -}}
 {{- $clusterGroup := index $over "clusterGroup" | default $base.clusterGroup | default $dr.name -}}
 {{- dict "name" (index $over "name" | default $base.name) "version" (index $over "version" | default $base.version) "clusterGroup" $clusterGroup "install_config" $installConfigWithBase | toJson -}}
 {{- end -}}
@@ -93,6 +97,9 @@
 {{- $over := index (.Values.clusterOverrides | default dict) "secondary" | default dict -}}
 {{- $base := $dr.clusters.secondary -}}
 {{- $baseIC := $base.install_config | default dict -}}
+{{- if and (index . "Files") (not (hasKey $baseIC "controlPlane")) -}}
+{{- $baseIC = fromJson ((index . "Files").Get "files/default-secondary-install-config.json") | default dict -}}
+{{- end -}}
 {{- $overIC := index . "secondaryOverrideInstallConfig" | default $over.install_config | default dict -}}
 {{- $merged := merge $overIC $baseIC -}}
 {{- $metadataMerged := merge (index $overIC "metadata" | default dict) (index $baseIC "metadata" | default dict) -}}
@@ -120,7 +127,7 @@
 {{- $installConfig := merge $merged (dict "compute" $computeFinal) -}}
 {{- $installConfigSafe := fromJson (include "rdr.sanitizeInstallConfig" $installConfig) -}}
 {{- $defaultBaseDomain := join "." (slice (splitList "." (.Values.global.clusterDomain | default "cluster.example.com")) 1) -}}
-{{- $installConfigWithBase := merge $installConfigSafe (dict "baseDomain" (default $defaultBaseDomain (index $installConfigSafe "baseDomain"))) -}}
+{{- $installConfigWithBase := merge $installConfigSafe (dict "baseDomain" ($defaultBaseDomain | default (index $installConfigSafe "baseDomain"))) -}}
 {{- $clusterGroup := index $over "clusterGroup" | default $base.clusterGroup | default $dr.name -}}
 {{- dict "name" (index $over "name" | default $base.name) "version" (index $over "version" | default $base.version) "clusterGroup" $clusterGroup "install_config" $installConfigWithBase | toJson -}}
 {{- end -}}
