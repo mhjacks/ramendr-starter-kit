@@ -454,8 +454,8 @@ if oc get configmap ramen-hub-operator-config -n openshift-operators &>/dev/null
   # Get existing ramen_manager_config.yaml content
   EXISTING_YAML=$(oc get configmap ramen-hub-operator-config -n openshift-operators -o jsonpath='{.data.ramen_manager_config\.yaml}' 2>/dev/null || echo "")
   
-  # We need exactly 2 s3StoreProfiles; script will create them if missing or insufficient
-  # Match structure: s3StoreProfiles may be under kubeObjectProtection or at top level
+  # Patch existing s3StoreProfiles only: add/update caCertificates on each existing profile.
+  # We do NOT create new profiles or delete/overwrite profile names. At least 2 existing profiles required.
   MIN_REQUIRED_PROFILES=2
   if [[ -n "$EXISTING_YAML" ]]; then
     if command -v yq &>/dev/null; then
@@ -473,94 +473,71 @@ if oc get configmap ramen-hub-operator-config -n openshift-operators &>/dev/null
     EXISTING_PROFILE_COUNT=$(echo "$EXISTING_PROFILE_COUNT" | tr -d ' \n\r' | grep -E '^[0-9]+$' || echo "0")
     EXISTING_PROFILE_COUNT=$((10#$EXISTING_PROFILE_COUNT))
     if [[ $EXISTING_PROFILE_COUNT -lt $MIN_REQUIRED_PROFILES ]]; then
-      echo "  Found $EXISTING_PROFILE_COUNT s3StoreProfiles; will ensure exactly $MIN_REQUIRED_PROFILES with caCertificates."
+      echo "  ❌ CRITICAL: Insufficient s3StoreProfiles found in existing ConfigMap"
+      echo "     Found: $EXISTING_PROFILE_COUNT profile(s)"
+      echo "     Required: At least $MIN_REQUIRED_PROFILES profiles"
+      echo "     Current YAML content (first 50 lines):"
+      echo "$EXISTING_YAML" | head -n 50
+      echo ""
+      echo "     The certificate extractor only patches existing s3StoreProfiles with caCertificates."
+      echo "     Please ensure ramen-hub-operator-config has at least $MIN_REQUIRED_PROFILES s3StoreProfiles configured."
+      handle_error "Insufficient s3StoreProfiles found: found $EXISTING_PROFILE_COUNT profile(s), but at least $MIN_REQUIRED_PROFILES are required"
     else
-      echo "  ✅ Found $EXISTING_PROFILE_COUNT s3StoreProfiles (will ensure exactly $MIN_REQUIRED_PROFILES with caCertificates)"
+      echo "  ✅ Found $EXISTING_PROFILE_COUNT s3StoreProfiles (will patch caCertificates into existing profiles only)"
     fi
   fi
 
-  # Create updated YAML with exactly 2 s3StoreProfiles, each with caCertificates
+  # Patch existing profiles: add/update caCertificates only; do not create or delete profiles
   if [[ -n "$EXISTING_YAML" ]]; then
-    # Create a temporary YAML file with the update
     echo "$EXISTING_YAML" > "$WORK_DIR/existing-ramen-config.yaml"
-    
     echo "  Existing YAML content (first 20 lines):"
     echo "$EXISTING_YAML" | head -n 20
-    
-    # Try to install PyYAML first, or use alternative methods
-    echo "  Attempting to update s3StoreProfiles with caCertificates..."
-    
-    # Method 1: Try Python with PyYAML first (most reliable)
+    echo "  Attempting to patch s3StoreProfiles with caCertificates..."
+
     PYTHON_SUCCESS=false
     if python3 -c "import yaml" 2>/dev/null || python3 -m pip install --user PyYAML 2>&1 | grep -q "Successfully installed\|Requirement already satisfied"; then
-      echo "  Using Python with PyYAML to update s3StoreProfiles..."
+      echo "  Using Python with PyYAML to patch existing s3StoreProfiles..."
       export CA_BUNDLE_BASE64
-      export PRIMARY_CLUSTER
-      export SECONDARY_CLUSTER
       if python3 -c "
 import yaml
 import sys
 import os
 
-# Dumper that never emits YAML anchors/aliases (avoids *id001 style refs)
 class NoAliasDumper(yaml.SafeDumper):
     def ignore_aliases(self, data):
         return True
 
 ca_bundle = os.environ.get('CA_BUNDLE_BASE64', '')
-primary_name = os.environ.get('PRIMARY_CLUSTER', 'ocp-primary')
-secondary_name = os.environ.get('SECONDARY_CLUSTER', 'ocp-secondary')
 
-REQUIRED = 2
-
-def ensure_exactly_two_profiles(profiles, ca_bundle, primary_name, secondary_name):
+def patch_profiles(profiles):
     if not isinstance(profiles, list):
-        return [{'s3ProfileName': primary_name, 'caCertificates': ca_bundle}, {'s3ProfileName': secondary_name, 'caCertificates': ca_bundle}]
+        return 0
+    n = 0
     for p in profiles:
         if isinstance(p, dict):
             p['caCertificates'] = ca_bundle
-    while len(profiles) < REQUIRED:
-        profiles.append({'s3ProfileName': (primary_name if len(profiles) == 0 else secondary_name), 'caCertificates': ca_bundle})
-    if len(profiles) > REQUIRED:
-        del profiles[REQUIRED:]
-    profiles[0]['s3ProfileName'] = primary_name
-    profiles[0]['caCertificates'] = ca_bundle
-    profiles[1]['s3ProfileName'] = secondary_name
-    profiles[1]['caCertificates'] = ca_bundle
-    return profiles
+            n += 1
+    return n
 
 try:
     with open('$WORK_DIR/existing-ramen-config.yaml', 'r') as f:
         config = yaml.safe_load(f) or {}
-    
     if config is None:
         config = {}
-    
-    if 'kubeObjectProtection' not in config:
-        config['kubeObjectProtection'] = {}
-    kop = config['kubeObjectProtection']
-    if not isinstance(kop, dict):
-        kop = {}
-        config['kubeObjectProtection'] = kop
-    if 's3StoreProfiles' not in kop or not isinstance(kop['s3StoreProfiles'], list):
-        kop['s3StoreProfiles'] = []
-    kop['s3StoreProfiles'] = ensure_exactly_two_profiles(kop['s3StoreProfiles'], ca_bundle, primary_name, secondary_name)
-    config['s3StoreProfiles'] = list(kop['s3StoreProfiles'])
-    updated_count = REQUIRED
-    
-    print(f'Ensured exactly {REQUIRED} s3StoreProfiles with caCertificates', file=sys.stderr)
-    
+    updated_count = 0
+    if 's3StoreProfiles' in config and isinstance(config['s3StoreProfiles'], list):
+        updated_count += patch_profiles(config['s3StoreProfiles'])
+    kop = config.get('kubeObjectProtection')
+    if isinstance(kop, dict) and 's3StoreProfiles' in kop and isinstance(kop['s3StoreProfiles'], list):
+        updated_count += patch_profiles(kop['s3StoreProfiles'])
+    if updated_count == 0:
+        print('ERROR: No s3StoreProfiles entries found to patch', file=sys.stderr)
+        sys.exit(1)
+    print(f'Patched {updated_count} existing s3StoreProfiles with caCertificates', file=sys.stderr)
     with open('$WORK_DIR/existing-ramen-config.yaml', 'w') as f:
         yaml.dump(config, f, default_flow_style=False, sort_keys=False, allow_unicode=True, Dumper=NoAliasDumper)
         f.flush()
         os.fsync(f.fileno())
-    
-    # Verify write: re-read and confirm caCertificates is present
-    with open('$WORK_DIR/existing-ramen-config.yaml', 'r') as f:
-        check = f.read()
-    if 'caCertificates' not in check and updated_count > 0:
-        print('ERROR: caCertificates not found in file after write', file=sys.stderr)
-        sys.exit(1)
     print('SUCCESS', file=sys.stderr)
     sys.exit(0)
 except Exception as e:
@@ -569,10 +546,10 @@ except Exception as e:
     traceback.print_exc(file=sys.stderr)
     sys.exit(1)
 " 2>&1; then
-        echo "  ✅ Successfully updated s3StoreProfiles with caCertificates using Python"
+        echo "  ✅ Successfully patched existing s3StoreProfiles with caCertificates using Python"
         PYTHON_SUCCESS=true
       else
-        echo "  ⚠️  Python update failed, trying yq..."
+        echo "  ⚠️  Python patch failed, trying yq..."
       fi
     fi
     
@@ -716,28 +693,11 @@ except Exception as e:
       echo "  Updated YAML content (first 20 lines):"
       echo "$UPDATED_YAML" | head -n 20
       
-      # If no caCertificates were added (e.g. no profiles in existing config or update failed), create minimal config with exactly 2 profiles
       if ! echo "$UPDATED_YAML" | grep -q "caCertificates"; then
-        echo "  ⚠️  No caCertificates in updated YAML (no s3StoreProfiles in config or update failed)."
-        echo "     Creating minimal ramen_manager_config with exactly 2 s3StoreProfiles and caCertificates..."
-        PRIMARY_NAME="${PRIMARY_CLUSTER:-ocp-primary}"
-        SECONDARY_NAME="${SECONDARY_CLUSTER:-ocp-secondary}"
-        UPDATED_YAML="kubeObjectProtection:
-  s3StoreProfiles:
-  - s3ProfileName: $PRIMARY_NAME
-    caCertificates: \"$CA_BUNDLE_BASE64\"
-  - s3ProfileName: $SECONDARY_NAME
-    caCertificates: \"$CA_BUNDLE_BASE64\"
-s3StoreProfiles:
-  - s3ProfileName: $PRIMARY_NAME
-    caCertificates: \"$CA_BUNDLE_BASE64\"
-  - s3ProfileName: $SECONDARY_NAME
-    caCertificates: \"$CA_BUNDLE_BASE64\""
-        echo "$UPDATED_YAML" > "$WORK_DIR/existing-ramen-config.yaml"
-        echo "  ✅ Created minimal config with 2 s3StoreProfiles (will be applied to ConfigMap)"
-      else
-        echo "  ✅ Verified: caCertificates found in updated YAML"
+        echo "  ❌ No caCertificates in updated YAML (patch failed or no s3StoreProfiles to patch)"
+        handle_error "Failed to patch ramen_manager_config with caCertificates - update produced no caCertificates"
       fi
+      echo "  ✅ Verified: caCertificates found in updated YAML"
     else
       echo "  ❌ Error: Updated YAML file not found"
       UPDATED_YAML="$EXISTING_YAML"
@@ -745,9 +705,14 @@ s3StoreProfiles:
     
     rm -f "$WORK_DIR/update_ramen_config.py"
   else
-    # No existing YAML, create new one with exactly 2 s3StoreProfiles named by cluster (under kubeObjectProtection for RamenConfig)
+    # No existing YAML (ConfigMap exists but ramen_manager_config.yaml empty): create minimal config with 2 profiles (parameterized by cluster name)
     UPDATED_YAML="kubeObjectProtection:
   s3StoreProfiles:
+  - s3ProfileName: $PRIMARY_CLUSTER
+    caCertificates: \"$CA_BUNDLE_BASE64\"
+  - s3ProfileName: $SECONDARY_CLUSTER
+    caCertificates: \"$CA_BUNDLE_BASE64\"
+s3StoreProfiles:
   - s3ProfileName: $PRIMARY_CLUSTER
     caCertificates: \"$CA_BUNDLE_BASE64\"
   - s3ProfileName: $SECONDARY_CLUSTER
@@ -1070,10 +1035,15 @@ with open('$WORK_DIR/ramen-patch.json', 'w') as f:
   rm -f "$WORK_DIR/existing-ramen-config.yaml" "$WORK_DIR/ramen_manager_config.yaml"
   
 else
-  echo "  ConfigMap does not exist, creating with ramen_manager_config.yaml containing exactly 2 s3StoreProfiles (${PRIMARY_CLUSTER}, ${SECONDARY_CLUSTER}) with caCertificates..."
+  echo "  ConfigMap does not exist, creating with ramen_manager_config.yaml containing 2 s3StoreProfiles (${PRIMARY_CLUSTER}, ${SECONDARY_CLUSTER}) with caCertificates..."
   oc create configmap ramen-hub-operator-config -n openshift-operators \
     --from-literal=ramen_manager_config.yaml="kubeObjectProtection:
   s3StoreProfiles:
+  - s3ProfileName: $PRIMARY_CLUSTER
+    caCertificates: \"$CA_BUNDLE_BASE64\"
+  - s3ProfileName: $SECONDARY_CLUSTER
+    caCertificates: \"$CA_BUNDLE_BASE64\"
+s3StoreProfiles:
   - s3ProfileName: $PRIMARY_CLUSTER
     caCertificates: \"$CA_BUNDLE_BASE64\"
   - s3ProfileName: $SECONDARY_CLUSTER
