@@ -1,16 +1,41 @@
 {{/*
-  Sanitize install_config for OpenShift installer: ensure apiVersion, strip invalid keys (e.g. vpc),
-  and only pass through allowed top-level keys so installer never sees unknown fields.
+  Sanitize install_config for OpenShift installer: ensure apiVersion, pass through all
+  install-config fields (including full platform.aws: region, subnets, userTags, amiID,
+  defaultMachinePlatform, serviceEndpoints, etc.) so regionalDR and clusterOverrides
+  can override platform/region effectively. Only strip keys known invalid for the
+  installer (e.g. vpc in platform.aws).
 */}}
 {{- define "rdr.sanitizeInstallConfig" -}}
 {{- $raw := . -}}
 {{- $withVersion := merge (dict "apiVersion" "v1") $raw -}}
 {{- $platform := index $withVersion "platform" | default dict -}}
 {{- $aws := index $platform "aws" | default dict -}}
-{{- $awsSafe := dict "region" (index $aws "region") "userTags" (index $aws "userTags" | default dict) -}}
+{{- /* Pass through full platform.aws (region, subnets, userTags, amiID, defaultMachinePlatform, serviceEndpoints, etc.); omit only known-invalid keys like vpc */ -}}
+{{- $awsSafe := ternary (omit $aws "vpc") $aws (and (kindIs "map" $aws) (hasKey $aws "vpc")) -}}
 {{- $platformSafe := merge $platform (dict "aws" $awsSafe) -}}
 {{- $allowed := dict "apiVersion" (index $withVersion "apiVersion") "baseDomain" (index $withVersion "baseDomain") "metadata" (index $withVersion "metadata") "controlPlane" (index $withVersion "controlPlane") "compute" (index $withVersion "compute") "networking" (index $withVersion "networking") "platform" $platformSafe "publish" (index $withVersion "publish") "pullSecret" (index $withVersion "pullSecret") "sshKey" (index $withVersion "sshKey") -}}
 {{- $allowed | toJson -}}
+{{- end -}}
+
+{{/*
+  Deep-merge install_config so clusterOverrides can override only platform/region,
+  metadata, or any subset without replacing the rest of base install_config.
+*/}}
+{{- define "rdr.mergeInstallConfig" -}}
+{{- $base := index . 0 -}}
+{{- $over := index . 1 -}}
+{{- $merged := merge ($base | default dict) ($over | default dict) -}}
+{{- $metadataBase := index $base "metadata" | default dict -}}
+{{- $metadataOver := index $over "metadata" | default dict -}}
+{{- $merged := merge $merged (dict "metadata" (merge $metadataBase $metadataOver)) -}}
+{{- $platformBase := index $base "platform" | default dict -}}
+{{- $platformOver := index $over "platform" | default dict -}}
+{{- $platformMerged := merge $platformBase $platformOver -}}
+{{- $awsBase := index $platformBase "aws" | default dict -}}
+{{- $awsOver := index $platformOver "aws" | default dict -}}
+{{- $awsMerged := merge $awsBase $awsOver -}}
+{{- $platformFinal := merge $platformMerged (dict "aws" $awsMerged) -}}
+{{- merge $merged (dict "platform" $platformFinal) | toJson -}}
 {{- end -}}
 
 {{/*
@@ -21,7 +46,7 @@
 {{- $dr := index .Values.regionalDR 0 -}}
 {{- $over := index (.Values.clusterOverrides | default dict) "primary" | default dict -}}
 {{- $base := $dr.clusters.primary -}}
-{{- $installConfig := merge ($base.install_config | default dict) (index $over "install_config" | default dict) -}}
+{{- $installConfig := fromJson (include "rdr.mergeInstallConfig" (list ($base.install_config | default dict) (index $over "install_config" | default dict))) -}}
 {{- $installConfigSafe := fromJson (include "rdr.sanitizeInstallConfig" $installConfig) -}}
 {{- $defaultBaseDomain := join "." (slice (splitList "." (.Values.global.clusterDomain | default "cluster.example.com")) 1) -}}
 {{- $installConfigWithBase := merge $installConfigSafe (dict "baseDomain" (default $defaultBaseDomain (index $installConfigSafe "baseDomain"))) -}}
@@ -36,7 +61,7 @@
 {{- $dr := index .Values.regionalDR 0 -}}
 {{- $over := index (.Values.clusterOverrides | default dict) "secondary" | default dict -}}
 {{- $base := $dr.clusters.secondary -}}
-{{- $installConfig := merge ($base.install_config | default dict) (index $over "install_config" | default dict) -}}
+{{- $installConfig := fromJson (include "rdr.mergeInstallConfig" (list ($base.install_config | default dict) (index $over "install_config" | default dict))) -}}
 {{- $installConfigSafe := fromJson (include "rdr.sanitizeInstallConfig" $installConfig) -}}
 {{- $defaultBaseDomain := join "." (slice (splitList "." (.Values.global.clusterDomain | default "cluster.example.com")) 1) -}}
 {{- $installConfigWithBase := merge $installConfigSafe (dict "baseDomain" (default $defaultBaseDomain (index $installConfigSafe "baseDomain"))) -}}
