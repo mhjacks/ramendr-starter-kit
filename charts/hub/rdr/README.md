@@ -17,9 +17,11 @@ From the **repository root**:
   - `charts/hub/rdr/files/default-secondary-install-config.json`
 - **When to run:** After editing `install_config` in this chart’s `values.yaml`.
 - **Dry-run:** To print the generated JSON without writing files:
+
   ```bash
   ./scripts/update-rdr-default-install-config-json.sh --dry-run
   ```
+
 - **Requirements:** Python 3 with PyYAML (`pip install pyyaml`), or `yq` (and optionally `jq`).
 
 Then run the install_config tests to confirm nothing is broken:
