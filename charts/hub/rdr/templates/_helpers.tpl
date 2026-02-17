@@ -50,7 +50,7 @@
 {{- $base := $dr.clusters.primary -}}
 {{- $baseIC := $base.install_config | default dict -}}
 {{- $overIC := index . "primaryOverrideInstallConfig" | default $over.install_config | default dict -}}
-{{- /* Shallow merge: over wins. Deep-merge metadata and platform.aws so over wins for region. */ -}}
+{{- /* Shallow merge: over wins. Deep-merge metadata, platform.aws, controlPlane, compute so over wins but base keeps machine types when over is partial. */ -}}
 {{- $merged := merge $overIC $baseIC -}}
 {{- $metadataMerged := merge (index $overIC "metadata" | default dict) (index $baseIC "metadata" | default dict) -}}
 {{- $merged := merge $merged (dict "metadata" $metadataMerged) -}}
@@ -59,7 +59,24 @@
 {{- $awsOver := index (index $overIC "platform" | default dict) "aws" | default dict -}}
 {{- $awsMerged := merge $awsOver $awsBase -}}
 {{- $platformFinal := merge $platformBase (dict "aws" $awsMerged) -}}
-{{- $installConfig := merge $merged (dict "platform" $platformFinal) -}}
+{{- $merged := merge $merged (dict "platform" $platformFinal) -}}
+{{- /* Deep-merge controlPlane so override can set platform.aws.type without dropping base name/replicas */ -}}
+{{- $cpBase := index $baseIC "controlPlane" | default dict -}}
+{{- $cpOver := index $overIC "controlPlane" | default dict -}}
+{{- $cpMerged := merge $cpOver $cpBase -}}
+{{- $cpPlatformBase := index $cpBase "platform" | default dict -}}
+{{- $cpPlatformOver := index $cpOver "platform" | default dict -}}
+{{- $cpAwsBase := index $cpPlatformBase "aws" | default dict -}}
+{{- $cpAwsOver := index $cpPlatformOver "aws" | default dict -}}
+{{- $cpAwsMerged := merge $cpAwsOver $cpAwsBase -}}
+{{- $cpPlatformFinal := merge $cpPlatformBase (dict "aws" $cpAwsMerged) -}}
+{{- $controlPlaneFinal := merge $cpMerged (dict "platform" $cpPlatformFinal) -}}
+{{- $merged := merge $merged (dict "controlPlane" $controlPlaneFinal) -}}
+{{- /* Compute: override list wins if non-empty; else use base so base machine types are kept */ -}}
+{{- $computeBase := index $baseIC "compute" | default list -}}
+{{- $computeOver := index $overIC "compute" | default list -}}
+{{- $computeFinal := ternary $computeOver $computeBase (gt (len $computeOver) 0) -}}
+{{- $installConfig := merge $merged (dict "compute" $computeFinal) -}}
 {{- $installConfigSafe := fromJson (include "rdr.sanitizeInstallConfig" $installConfig) -}}
 {{- $defaultBaseDomain := join "." (slice (splitList "." (.Values.global.clusterDomain | default "cluster.example.com")) 1) -}}
 {{- $installConfigWithBase := merge $installConfigSafe (dict "baseDomain" (default $defaultBaseDomain (index $installConfigSafe "baseDomain"))) -}}
@@ -85,7 +102,22 @@
 {{- $awsOver := index (index $overIC "platform" | default dict) "aws" | default dict -}}
 {{- $awsMerged := merge $awsOver $awsBase -}}
 {{- $platformFinal := merge $platformBase (dict "aws" $awsMerged) -}}
-{{- $installConfig := merge $merged (dict "platform" $platformFinal) -}}
+{{- $merged := merge $merged (dict "platform" $platformFinal) -}}
+{{- $cpBase := index $baseIC "controlPlane" | default dict -}}
+{{- $cpOver := index $overIC "controlPlane" | default dict -}}
+{{- $cpMerged := merge $cpOver $cpBase -}}
+{{- $cpPlatformBase := index $cpBase "platform" | default dict -}}
+{{- $cpPlatformOver := index $cpOver "platform" | default dict -}}
+{{- $cpAwsBase := index $cpPlatformBase "aws" | default dict -}}
+{{- $cpAwsOver := index $cpPlatformOver "aws" | default dict -}}
+{{- $cpAwsMerged := merge $cpAwsOver $cpAwsBase -}}
+{{- $cpPlatformFinal := merge $cpPlatformBase (dict "aws" $cpAwsMerged) -}}
+{{- $controlPlaneFinal := merge $cpMerged (dict "platform" $cpPlatformFinal) -}}
+{{- $merged := merge $merged (dict "controlPlane" $controlPlaneFinal) -}}
+{{- $computeBase := index $baseIC "compute" | default list -}}
+{{- $computeOver := index $overIC "compute" | default list -}}
+{{- $computeFinal := ternary $computeOver $computeBase (gt (len $computeOver) 0) -}}
+{{- $installConfig := merge $merged (dict "compute" $computeFinal) -}}
 {{- $installConfigSafe := fromJson (include "rdr.sanitizeInstallConfig" $installConfig) -}}
 {{- $defaultBaseDomain := join "." (slice (splitList "." (.Values.global.clusterDomain | default "cluster.example.com")) 1) -}}
 {{- $installConfigWithBase := merge $installConfigSafe (dict "baseDomain" (default $defaultBaseDomain (index $installConfigSafe "baseDomain"))) -}}
