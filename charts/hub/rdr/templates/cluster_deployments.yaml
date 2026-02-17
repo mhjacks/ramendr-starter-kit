@@ -1,7 +1,8 @@
 {{- $dr := index .Values.regionalDR 0 }}
 {{- $clusterSet := $dr.name }}
-{{- $effectivePrimary := include "rdr.effectivePrimaryCluster" . | fromJson }}
-{{- $effectiveSecondary := include "rdr.effectiveSecondaryCluster" . | fromJson }}
+{{- $ctx := dict "Values" .Values "primaryOverrideInstallConfig" (index (index .Values.clusterOverrides "primary" | default dict) "install_config" | default dict) "secondaryOverrideInstallConfig" (index (index .Values.clusterOverrides "secondary" | default dict) "install_config" | default dict) }}
+{{- $effectivePrimary := include "rdr.effectivePrimaryCluster" $ctx | fromJson }}
+{{- $effectiveSecondary := include "rdr.effectiveSecondaryCluster" $ctx | fromJson }}
 {{- $defaultBaseDomain := join "." (slice (splitList "." (.Values.global.clusterDomain | default "cluster.example.com")) 1) }}
 {{- range list $effectivePrimary $effectiveSecondary }}
 {{- $cluster := . }}

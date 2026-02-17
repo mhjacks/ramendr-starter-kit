@@ -20,33 +20,46 @@
 {{/*
   Deep-merge install_config so clusterOverrides can override only platform/region,
   metadata, or any subset without replacing the rest of base install_config.
+  Call with dict "base" <base install_config> "over" <override install_config>.
 */}}
 {{- define "rdr.mergeInstallConfig" -}}
-{{- $base := index . 0 -}}
-{{- $over := index . 1 -}}
-{{- $merged := merge ($base | default dict) ($over | default dict) -}}
-{{- $metadataBase := index $base "metadata" | default dict -}}
-{{- $metadataOver := index $over "metadata" | default dict -}}
-{{- $merged := merge $merged (dict "metadata" (merge $metadataBase $metadataOver)) -}}
+{{- $base := .base | default dict -}}
+{{- $over := .over | default dict -}}
+{{- /* Sprig merge: first dict wins; put over first so override wins */ -}}
+{{- $merged := merge $over $base -}}
+{{- $metadataMerged := merge (index $over "metadata" | default dict) (index $base "metadata" | default dict) -}}
+{{- $merged := merge $merged (dict "metadata" $metadataMerged) -}}
 {{- $platformBase := index $base "platform" | default dict -}}
 {{- $platformOver := index $over "platform" | default dict -}}
-{{- $platformMerged := merge $platformBase $platformOver -}}
 {{- $awsBase := index $platformBase "aws" | default dict -}}
 {{- $awsOver := index $platformOver "aws" | default dict -}}
-{{- $awsMerged := merge $awsBase $awsOver -}}
-{{- $platformFinal := merge $platformMerged (dict "aws" $awsMerged) -}}
+{{- $awsMerged := merge $awsOver $awsBase -}}
+{{- $platformFinal := merge $platformBase (dict "aws" $awsMerged) -}}
 {{- merge $merged (dict "platform" $platformFinal) | toJson -}}
 {{- end -}}
 
 {{/*
   Effective primary cluster: merge of regionalDR[0].clusters.primary and clusterOverrides.primary.
   Use when clusterOverrides is set to avoid replacing full regionalDR in override file.
+  Call with a context that has .Values and optionally .primaryOverrideInstallConfig (override install_config);
+  if primaryOverrideInstallConfig is not provided, falls back to .Values.clusterOverrides.primary.install_config.
 */}}
 {{- define "rdr.effectivePrimaryCluster" -}}
 {{- $dr := index .Values.regionalDR 0 -}}
 {{- $over := index (.Values.clusterOverrides | default dict) "primary" | default dict -}}
 {{- $base := $dr.clusters.primary -}}
-{{- $installConfig := fromJson (include "rdr.mergeInstallConfig" (list ($base.install_config | default dict) (index $over "install_config" | default dict))) -}}
+{{- $baseIC := $base.install_config | default dict -}}
+{{- $overIC := index . "primaryOverrideInstallConfig" | default $over.install_config | default dict -}}
+{{- /* Shallow merge: over wins. Deep-merge metadata and platform.aws so over wins for region. */ -}}
+{{- $merged := merge $overIC $baseIC -}}
+{{- $metadataMerged := merge (index $overIC "metadata" | default dict) (index $baseIC "metadata" | default dict) -}}
+{{- $merged := merge $merged (dict "metadata" $metadataMerged) -}}
+{{- $platformBase := index $baseIC "platform" | default dict -}}
+{{- $awsBase := index $platformBase "aws" | default dict -}}
+{{- $awsOver := index (index $overIC "platform" | default dict) "aws" | default dict -}}
+{{- $awsMerged := merge $awsOver $awsBase -}}
+{{- $platformFinal := merge $platformBase (dict "aws" $awsMerged) -}}
+{{- $installConfig := merge $merged (dict "platform" $platformFinal) -}}
 {{- $installConfigSafe := fromJson (include "rdr.sanitizeInstallConfig" $installConfig) -}}
 {{- $defaultBaseDomain := join "." (slice (splitList "." (.Values.global.clusterDomain | default "cluster.example.com")) 1) -}}
 {{- $installConfigWithBase := merge $installConfigSafe (dict "baseDomain" (default $defaultBaseDomain (index $installConfigSafe "baseDomain"))) -}}
@@ -56,12 +69,23 @@
 
 {{/*
   Effective secondary cluster: merge of regionalDR[0].clusters.secondary and clusterOverrides.secondary.
+  Call with a context that has .Values and optionally .secondaryOverrideInstallConfig.
 */}}
 {{- define "rdr.effectiveSecondaryCluster" -}}
 {{- $dr := index .Values.regionalDR 0 -}}
 {{- $over := index (.Values.clusterOverrides | default dict) "secondary" | default dict -}}
 {{- $base := $dr.clusters.secondary -}}
-{{- $installConfig := fromJson (include "rdr.mergeInstallConfig" (list ($base.install_config | default dict) (index $over "install_config" | default dict))) -}}
+{{- $baseIC := $base.install_config | default dict -}}
+{{- $overIC := index . "secondaryOverrideInstallConfig" | default $over.install_config | default dict -}}
+{{- $merged := merge $overIC $baseIC -}}
+{{- $metadataMerged := merge (index $overIC "metadata" | default dict) (index $baseIC "metadata" | default dict) -}}
+{{- $merged := merge $merged (dict "metadata" $metadataMerged) -}}
+{{- $platformBase := index $baseIC "platform" | default dict -}}
+{{- $awsBase := index $platformBase "aws" | default dict -}}
+{{- $awsOver := index (index $overIC "platform" | default dict) "aws" | default dict -}}
+{{- $awsMerged := merge $awsOver $awsBase -}}
+{{- $platformFinal := merge $platformBase (dict "aws" $awsMerged) -}}
+{{- $installConfig := merge $merged (dict "platform" $platformFinal) -}}
 {{- $installConfigSafe := fromJson (include "rdr.sanitizeInstallConfig" $installConfig) -}}
 {{- $defaultBaseDomain := join "." (slice (splitList "." (.Values.global.clusterDomain | default "cluster.example.com")) 1) -}}
 {{- $installConfigWithBase := merge $installConfigSafe (dict "baseDomain" (default $defaultBaseDomain (index $installConfigSafe "baseDomain"))) -}}
