@@ -1,14 +1,4 @@
 ---
-# DR pair cluster names - same structure as rdr chart. opp-policy reads this.
-# For rdr chart, merge values-hub first then rdr/values so full regionalDR is preserved.
-regionalDR:
-  - name: resilient
-    clusters:
-      primary:
-        name: ocp-primary
-      secondary:
-        name: ocp-secondary
-
 clusterGroup:
   name: hub
   isHubCluster: true
@@ -22,7 +12,6 @@ clusterGroup:
     - openshift-dr-ops
     - openshift-storage
     - policies
-    # - regional-dr-trigger
   subscriptions:
     acm:
       name: advanced-cluster-management
@@ -46,7 +35,6 @@ clusterGroup:
   # Explicitly mention the cluster-state based overrides we plan to use for this pattern.
   # We can use self-referential variables because the chart calls the tpl function with these variables defined
   sharedValueFiles:
-    - '/overrides/values-cluster-names.yaml'
     - '/overrides/values-{{ $.Values.global.clusterPlatform }}.yaml'
   # sharedValueFiles is a flexible mechanism that will add the listed valuefiles to every app defined in the
   # applications section. We intend this to supplement and possibly even replace previous "magic" mechanisms, though
@@ -108,6 +96,8 @@ clusterGroup:
           - PrunePropagationPolicy=foreground
           - RespectIgnoreDifferences=true
           - ServerSideApply=true
+      extraValueFiles:
+        - '/overrides/values-cluster-names.yaml'
       ignoreDifferences:
       - group: operators.openshift.io
         kind: Console
@@ -132,6 +122,8 @@ clusterGroup:
             maxDuration: 3m
         syncOptions:
           - RespectIgnoreDifferences=true
+      extraValueFiles:
+        - '/overrides/values-cluster-names.yaml'
       ignoreDifferences:
         # Prevent ArgoCD from pruning dynamically created OCM resources
         # These resources are created by OCM operators and should never be pruned
