@@ -4,17 +4,6 @@
 {{- $effectivePrimary := include "rdr.effectivePrimaryCluster" $ctx | fromJson }}
 {{- $effectiveSecondary := include "rdr.effectiveSecondaryCluster" $ctx | fromJson }}
 {{- $defaultBaseDomain := join "." (slice (splitList "." (.Values.global.clusterDomain | default "cluster.example.com")) 1) }}
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: rdr-debug
-  namespace: default
-data:
-  overIC_region: {{ $effectivePrimary._overICRegion | default "MISSING" }}
-  merged_region: {{ $effectivePrimary._mergedRegion | default "MISSING" }}
-  safe_region: {{ $effectivePrimary._safeRegion | default "MISSING" }}
-  final_region: {{ $effectivePrimary._finalRegion | default "MISSING" }}
 {{- range list $effectivePrimary $effectiveSecondary }}
 {{- $cluster := . }}
 {{- $baseDomainRaw := index $cluster.install_config "baseDomain" }}

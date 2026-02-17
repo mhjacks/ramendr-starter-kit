@@ -13,7 +13,7 @@ clusterOverrides:
         name: ocp-p
       platform:
         aws:
-          region: flerbage
+          region: us-west-1
   secondary:
     name: ocp-s
     version: 4.18.7
