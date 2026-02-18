@@ -488,6 +488,7 @@ if oc get configmap ramen-hub-operator-config -n openshift-operators &>/dev/null
   fi
 
   # Patch existing profiles with caCertificates using yq only (env var avoids embedding base64 in expression)
+  PATCHED_VIA_YQ=false
   if [[ -n "$EXISTING_YAML" ]]; then
     echo "$EXISTING_YAML" > "$WORK_DIR/existing-ramen-config.yaml"
     echo "  Existing YAML content (first 20 lines):"
@@ -517,20 +518,21 @@ if oc get configmap ramen-hub-operator-config -n openshift-operators &>/dev/null
 
     rm -f "$WORK_DIR/existing-ramen-config.yaml.bak" "$WORK_DIR/existing-ramen-config.yaml.tmp"
 
-    # Verify the update
+    # Verify patch (grep in file; do NOT load full content into shell variable - base64 can exceed ARG_MAX and truncate)
     if [[ -f "$WORK_DIR/existing-ramen-config.yaml" ]]; then
-      UPDATED_YAML=$(cat "$WORK_DIR/existing-ramen-config.yaml")
-      echo "  Updated YAML content (first 20 lines):"
-      echo "$UPDATED_YAML" | head -n 20
-      
-      if ! echo "$UPDATED_YAML" | grep -q "caCertificates"; then
+      if ! grep -q "caCertificates" "$WORK_DIR/existing-ramen-config.yaml" 2>/dev/null; then
         echo "  ❌ No caCertificates in updated YAML (patch failed or no s3StoreProfiles to patch)"
         handle_error "Failed to patch ramen_manager_config with caCertificates - update produced no caCertificates"
       fi
+      echo "  Updated YAML content (first 20 lines):"
+      head -n 20 "$WORK_DIR/existing-ramen-config.yaml"
       echo "  ✅ Verified: caCertificates found in updated YAML"
+      # Copy file directly; do NOT use a shell variable (large base64 would truncate and break the applied ConfigMap)
+      cp "$WORK_DIR/existing-ramen-config.yaml" "$WORK_DIR/ramen_manager_config.yaml"
+      PATCHED_VIA_YQ=true
     else
       echo "  ❌ Error: Updated YAML file not found"
-      UPDATED_YAML="$EXISTING_YAML"
+      PATCHED_VIA_YQ=false
     fi
   else
     # No existing YAML (ConfigMap exists but ramen_manager_config.yaml empty): create minimal config with 2 profiles (parameterized by cluster name)
@@ -546,9 +548,11 @@ s3StoreProfiles:
   - s3ProfileName: $SECONDARY_CLUSTER
     caCertificates: \"$CA_BUNDLE_BASE64\""
   fi
-  
-  # Save updated YAML to a file for use with oc set data / manifest
-  echo "$UPDATED_YAML" > "$WORK_DIR/ramen_manager_config.yaml"
+
+  # Save updated YAML for apply (only write from variable when we did not already copy the patched file)
+  if [[ "$PATCHED_VIA_YQ" != "true" ]]; then
+    echo "$UPDATED_YAML" > "$WORK_DIR/ramen_manager_config.yaml"
+  fi
   
   echo "  Preparing to update ConfigMap with YAML content..."
   echo "  YAML file size: $(wc -c < "$WORK_DIR/ramen_manager_config.yaml") bytes"
@@ -560,10 +564,9 @@ s3StoreProfiles:
   oc get configmap ramen-hub-operator-config -n openshift-operators -o yaml > "$WORK_DIR/ramen-configmap-template.yaml" 2>/dev/null
   
   if [[ -f "$WORK_DIR/ramen-configmap-template.yaml" ]]; then
-    METADATA_NAMESPACE=$(grep -E '^\s+namespace:' "$WORK_DIR/ramen-configmap-template.yaml" | head -1 | sed 's/.*namespace:[[:space:]]*//')
-    METADATA_NAME=$(grep -E '^\s+name:' "$WORK_DIR/ramen-configmap-template.yaml" | head -1 | sed 's/.*name:[[:space:]]*//')
-    [[ -z "$METADATA_NAMESPACE" ]] && METADATA_NAMESPACE=openshift-operators
-    [[ -z "$METADATA_NAME" ]] && METADATA_NAME=ramen-hub-operator-config
+    # Always use the canonical name so we update the expected ConfigMap and verification finds it
+    METADATA_NAMESPACE=openshift-operators
+    METADATA_NAME=ramen-hub-operator-config
     echo "  Building ConfigMap manifest (literal block for ramen_manager_config.yaml)..."
     {
       echo "apiVersion: v1"
