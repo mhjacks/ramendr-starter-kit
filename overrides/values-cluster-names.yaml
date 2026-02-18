@@ -26,4 +26,4 @@ clusterOverrides:
 
 # DRPC overrides (preferredCluster defaults to primary if unset)
 drpc:
-  preferredCluster: ocp-p
+  preferredCluster: ocp-s
