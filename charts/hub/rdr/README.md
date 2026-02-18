@@ -45,13 +45,17 @@ then the Ramen/ODF DR controller has not yet applied the DR config to that manag
 
 1. **Hub operator** – ODF Multicluster Orchestrator / Ramen DR is installed on the hub and DRPolicy + DRCluster resources exist and are correct.
 2. **Clusters joined** – Both clusters appear as ManagedClusters and are available:
+
    ```bash
    oc get managedcluster ocp-p ocp-s
    ```
+
 3. **ManifestWorks** – Ramen creates ManifestWorks in each cluster’s namespace to deploy the DR cluster operator. On the hub:
+
    ```bash
    oc get manifestwork -n ocp-p
    oc get manifestwork -n ocp-s
    ```
+
    If these are missing or not applied, check Ramen controller logs on the hub.
 4. **Cluster readiness** – Clusters must be reachable from the hub so the hub can apply and reconcile the ManifestWork; ensure they are not degraded or not ready.
