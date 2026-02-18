@@ -487,206 +487,36 @@ if oc get configmap ramen-hub-operator-config -n openshift-operators &>/dev/null
     fi
   fi
 
-  # Patch existing profiles: add/update caCertificates only; do not create or delete profiles
+  # Patch existing profiles with caCertificates using yq only (env var avoids embedding base64 in expression)
   if [[ -n "$EXISTING_YAML" ]]; then
     echo "$EXISTING_YAML" > "$WORK_DIR/existing-ramen-config.yaml"
     echo "  Existing YAML content (first 20 lines):"
     echo "$EXISTING_YAML" | head -n 20
-    echo "  Attempting to patch s3StoreProfiles with caCertificates..."
+    echo "  Patching s3StoreProfiles with caCertificates using yq..."
 
-    PYTHON_SUCCESS=false
-    if python3 -c "import yaml" 2>/dev/null || python3 -m pip install --user PyYAML 2>&1 | grep -q "Successfully installed\|Requirement already satisfied"; then
-      echo "  Using Python with PyYAML to patch existing s3StoreProfiles..."
-      export CA_BUNDLE_BASE64
-      if python3 -c "
-import yaml
-import sys
-import os
-
-class NoAliasDumper(yaml.SafeDumper):
-    def ignore_aliases(self, data):
-        return True
-
-ca_bundle = os.environ.get('CA_BUNDLE_BASE64', '')
-
-def patch_profiles(profiles):
-    if not isinstance(profiles, list):
-        return 0
-    n = 0
-    for p in profiles:
-        if isinstance(p, dict):
-            p['caCertificates'] = ca_bundle
-            n += 1
-    return n
-
-try:
-    with open('$WORK_DIR/existing-ramen-config.yaml', 'r') as f:
-        config = yaml.safe_load(f) or {}
-    if config is None:
-        config = {}
-    updated_count = 0
-    if 's3StoreProfiles' in config and isinstance(config['s3StoreProfiles'], list):
-        updated_count += patch_profiles(config['s3StoreProfiles'])
-    kop = config.get('kubeObjectProtection')
-    if isinstance(kop, dict) and 's3StoreProfiles' in kop and isinstance(kop['s3StoreProfiles'], list):
-        updated_count += patch_profiles(kop['s3StoreProfiles'])
-    if updated_count == 0:
-        print('ERROR: No s3StoreProfiles entries found to patch', file=sys.stderr)
-        sys.exit(1)
-    print(f'Patched {updated_count} existing s3StoreProfiles with caCertificates', file=sys.stderr)
-    with open('$WORK_DIR/existing-ramen-config.yaml', 'w') as f:
-        yaml.dump(config, f, default_flow_style=False, sort_keys=False, allow_unicode=True, Dumper=NoAliasDumper)
-        f.flush()
-        os.fsync(f.fileno())
-    print('SUCCESS', file=sys.stderr)
-    sys.exit(0)
-except Exception as e:
-    print(f'ERROR: {e}', file=sys.stderr)
-    import traceback
-    traceback.print_exc(file=sys.stderr)
-    sys.exit(1)
-" 2>&1; then
-        echo "  ✅ Successfully patched existing s3StoreProfiles with caCertificates using Python"
-        PYTHON_SUCCESS=true
-      else
-        echo "  ⚠️  Python patch failed, trying yq..."
-      fi
-    fi
-    
-    # Method 2: Try yq if Python failed (support top-level and kubeObjectProtection.s3StoreProfiles)
-    if [[ "$PYTHON_SUCCESS" != "true" ]] && command -v yq &>/dev/null; then
-      echo "  Using yq to update s3StoreProfiles..."
-      YQ_UPDATED=false
-      if yq eval '(.s3StoreProfiles[]? | select(has("name") or has("s3ProfileName"))) |= . + {"caCertificates": "'"$CA_BUNDLE_BASE64"'"}' -i "$WORK_DIR/existing-ramen-config.yaml" 2>/dev/null; then
-        YQ_UPDATED=true
-      fi
-      if yq eval '(.kubeObjectProtection.s3StoreProfiles[]? | select(has("name") or has("s3ProfileName"))) |= . + {"caCertificates": "'"$CA_BUNDLE_BASE64"'"}' -i "$WORK_DIR/existing-ramen-config.yaml" 2>/dev/null; then
-        YQ_UPDATED=true
-      fi
-      if [[ "$YQ_UPDATED" == "true" ]]; then
-        echo "  ✅ Successfully updated s3StoreProfiles with caCertificates using yq"
-        PYTHON_SUCCESS=true
-      else
-        echo "  ⚠️  yq failed, trying awk-based approach..."
-        PYTHON_SUCCESS=false
-      fi
-    fi
-    
-    # Method 3: Fallback to awk/sed if both Python and yq failed
-    if [[ "$PYTHON_SUCCESS" != "true" ]]; then
-      echo "  Using awk-based approach as fallback..."
-      {
-        # Use awk to update or add caCertificates to each s3StoreProfiles item
-        awk -v ca_bundle="$CA_BUNDLE_BASE64" '
-          BEGIN { in_profile=0; ca_added=0 }
-          /^s3StoreProfiles:/ { 
-            print
-            next
-          }
-          /^  - name:/ { 
-            in_profile=1
-            ca_added=0
-            print
-            next
-          }
-          in_profile && /^    caCertificates:/ {
-            print "    caCertificates: \"" ca_bundle "\""
-            ca_added=1
-            in_profile=0
-            next
-          }
-          in_profile && /^    [a-zA-Z]/ && !/^    caCertificates:/ {
-            if (!ca_added) {
-              print "    caCertificates: \"" ca_bundle "\""
-              ca_added=1
-            }
-            print
-            next
-          }
-          in_profile && /^  -/ {
-            if (!ca_added) {
-              print "    caCertificates: \"" ca_bundle "\""
-              ca_added=1
-            }
-            in_profile=0
-            print
-            next
-          }
-          in_profile && /^$/ {
-            if (!ca_added) {
-              print "    caCertificates: \"" ca_bundle "\""
-              ca_added=1
-            }
-            in_profile=0
-            print
-            next
-          }
-          { print }
-        ' "$WORK_DIR/existing-ramen-config.yaml" > "$WORK_DIR/existing-ramen-config.yaml.tmp" && \
-        mv "$WORK_DIR/existing-ramen-config.yaml.tmp" "$WORK_DIR/existing-ramen-config.yaml" && \
-        echo "  ✅ Updated s3StoreProfiles using awk" || {
-          echo "  ❌ awk-based approach failed"
-          PYTHON_SUCCESS=false
-        }
-      }
+    if ! command -v yq &>/dev/null; then
+      echo "  ❌ yq is required but not found in PATH"
+      handle_error "yq is required to patch ramen_manager_config with caCertificates; please install yq (e.g. mikefarah/yq)"
     fi
 
-    # Method 4: If still no caCertificates, try Python deep-search for any profile-like list (any path)
-    if [[ "$PYTHON_SUCCESS" != "true" ]] && [[ -f "$WORK_DIR/existing-ramen-config.yaml" ]] && ! grep -q "caCertificates" "$WORK_DIR/existing-ramen-config.yaml" 2>/dev/null; then
-      echo "  Trying Python deep-search for s3StoreProfiles (any path)..."
-      export CA_BUNDLE_BASE64
-      if python3 -c "
-import yaml
-import os
-import sys
-
-class NoAliasDumper(yaml.SafeDumper):
-    def ignore_aliases(self, data):
-        return True
-
-ca_bundle = os.environ.get('CA_BUNDLE_BASE64', '')
-PROFILE_KEYS = ('s3ProfileName', 's3Bucket', 's3Region', 'name', 'endpoint')
-
-def looks_like_profile(d):
-    return isinstance(d, dict) and any(k in d for k in PROFILE_KEYS)
-
-def add_ca_deep(obj, count):
-    if isinstance(obj, list):
-        for item in obj:
-            if looks_like_profile(item):
-                item['caCertificates'] = ca_bundle
-                count += 1
-            else:
-                count = add_ca_deep(item, count)
-    elif isinstance(obj, dict):
-        for v in obj.values():
-            count = add_ca_deep(v, count)
-    return count
-
-try:
-    with open('$WORK_DIR/existing-ramen-config.yaml', 'r') as f:
-        config = yaml.safe_load(f) or {}
-    n = add_ca_deep(config, 0)
-    if n > 0:
-        with open('$WORK_DIR/existing-ramen-config.yaml', 'w') as f:
-            yaml.dump(config, f, default_flow_style=False, sort_keys=False, allow_unicode=True, Dumper=NoAliasDumper)
-            f.flush()
-            os.fsync(f.fileno())
-        print(f'Deep-search updated {n} profile(s) with caCertificates', file=sys.stderr)
-        sys.exit(0)
-    sys.exit(1)
-except Exception as e:
-    print(str(e), file=sys.stderr)
-    sys.exit(1)
-" 2>&1; then
-        echo "  ✅ Updated s3StoreProfiles using Python deep-search"
-        PYTHON_SUCCESS=true
-      fi
+    export CA_BUNDLE_BASE64
+    YQ_PATCHED=false
+    # Use strenv() so the base64 value is passed as a string without embedding in the expression (avoids quoting/special-char issues)
+    if yq eval -i '.s3StoreProfiles[]? |= . + {"caCertificates": strenv(CA_BUNDLE_BASE64)}' "$WORK_DIR/existing-ramen-config.yaml" 2>/dev/null; then
+      YQ_PATCHED=true
     fi
-    
-    # Clean up temporary files
+    if yq eval -i '.kubeObjectProtection.s3StoreProfiles[]? |= . + {"caCertificates": strenv(CA_BUNDLE_BASE64)}' "$WORK_DIR/existing-ramen-config.yaml" 2>/dev/null; then
+      YQ_PATCHED=true
+    fi
+    if [[ "$YQ_PATCHED" != "true" ]]; then
+      echo "  ❌ yq failed to patch s3StoreProfiles (no top-level or kubeObjectProtection.s3StoreProfiles found?)"
+      echo "  yq version: $(yq --version 2>/dev/null || true)"
+      handle_error "yq could not update s3StoreProfiles with caCertificates"
+    fi
+    echo "  ✅ Patched existing s3StoreProfiles with caCertificates using yq"
+
     rm -f "$WORK_DIR/existing-ramen-config.yaml.bak" "$WORK_DIR/existing-ramen-config.yaml.tmp"
-    
+
     # Verify the update
     if [[ -f "$WORK_DIR/existing-ramen-config.yaml" ]]; then
       UPDATED_YAML=$(cat "$WORK_DIR/existing-ramen-config.yaml")
@@ -702,8 +532,6 @@ except Exception as e:
       echo "  ❌ Error: Updated YAML file not found"
       UPDATED_YAML="$EXISTING_YAML"
     fi
-    
-    rm -f "$WORK_DIR/update_ramen_config.py"
   else
     # No existing YAML (ConfigMap exists but ramen_manager_config.yaml empty): create minimal config with 2 profiles (parameterized by cluster name)
     UPDATED_YAML="kubeObjectProtection:
