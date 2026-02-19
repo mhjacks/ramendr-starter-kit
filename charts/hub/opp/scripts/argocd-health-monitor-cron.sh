@@ -11,6 +11,8 @@ SECONDARY_CLUSTER="${SECONDARY_CLUSTER:-ocp-secondary}"
 MAX_ATTEMPTS=270  # Check 270 times (90 minutes with 20s intervals) before failing
 SLEEP_INTERVAL=20
 ARGOCD_NAMESPACE="openshift-gitops"
+# Namespace where the Application to force-sync lives (parameterized; default gitops-vms)
+FORCE_SYNC_APP_NAMESPACE="${FORCE_SYNC_APP_NAMESPACE:-gitops-vms}"
 HEALTH_CHECK_TIMEOUT=30
 
 # Function to check if a cluster is wedged
@@ -100,62 +102,21 @@ check_cluster_wedged() {
   fi
 }
 
-# Function to remediate a wedged cluster
+# Function to remediate a wedged cluster (force sync a known resource instead of restarting Argo CD)
 remediate_wedged_cluster() {
   local cluster="$1"
   local kubeconfig="$2"
   
-  echo "🔧 Remediating wedged cluster: $cluster"
+  echo "🔧 Remediating wedged cluster: $cluster (forcibly resyncing an application)"
   
-  # Stop all ArgoCD instances by scaling down deployments
-  echo "  Stopping all ArgoCD instances on $cluster..."
-  oc --kubeconfig="$kubeconfig" scale deployment --all -n "$ARGOCD_NAMESPACE" --replicas=0 &>/dev/null || true
-  oc --kubeconfig="$kubeconfig" scale statefulset --all -n "$ARGOCD_NAMESPACE" --replicas=0 &>/dev/null || true
-  
-  # If scaling doesn't work, try more aggressive cleanup
-  echo "  Attempting aggressive cleanup for stuck deployments..."
-  oc --kubeconfig="$kubeconfig" delete deployment --all -n "$ARGOCD_NAMESPACE" --grace-period=0 --force &>/dev/null || true
-  oc --kubeconfig="$kubeconfig" delete statefulset --all -n "$ARGOCD_NAMESPACE" --grace-period=0 --force &>/dev/null || true
-  oc --kubeconfig="$kubeconfig" delete pods --all -n "$ARGOCD_NAMESPACE" --grace-period=0 --force &>/dev/null || true
-  
-  # Wait for all instances to stop
-  echo "  Waiting for ArgoCD instances to stop..."
-  local attempt=1
-  while [[ $attempt -le 30 ]]; do
-    local running_pods=$(oc --kubeconfig="$kubeconfig" get pods -n "$ARGOCD_NAMESPACE" --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l)
-    if [[ $running_pods -eq 0 ]]; then
-      echo "  ✅ All ArgoCD instances stopped on $cluster"
-      break
-    fi
-    echo "  Waiting for instances to stop... (attempt $attempt/30)"
-    sleep 5
-    ((attempt++))
-  done
-  
-  # Restart all ArgoCD instances by scaling up deployments
-  echo "  Restarting all ArgoCD instances on $cluster..."
-  oc --kubeconfig="$kubeconfig" scale deployment --all -n "$ARGOCD_NAMESPACE" --replicas=1 &>/dev/null || true
-  oc --kubeconfig="$kubeconfig" scale statefulset --all -n "$ARGOCD_NAMESPACE" --replicas=1 &>/dev/null || true
-  
-  # Wait for pods to restart
-  echo "  Waiting for ArgoCD pods to restart on $cluster..."
-  local attempt=1
-  while [[ $attempt -le 20 ]]; do
-    local running_pods=$(oc --kubeconfig="$kubeconfig" get pods -n "$ARGOCD_NAMESPACE" --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l)
-    local total_pods=$(oc --kubeconfig="$kubeconfig" get pods -n "$ARGOCD_NAMESPACE" --no-headers 2>/dev/null | wc -l)
-    
-    if [[ $running_pods -gt 0 && $running_pods -eq $total_pods ]]; then
-      echo "  ✅ ArgoCD pods restarted successfully on $cluster"
-      break
-    fi
-    
-    echo "  Waiting for pods to restart... (attempt $attempt/20)"
-    sleep 10
-    ((attempt++))
-  done
-  
-  if [[ $attempt -gt 20 ]]; then
-    echo "  ⚠️  ArgoCD pods may not have fully restarted on $cluster"
+  # Forcibly resync an Application known to exist in FORCE_SYNC_APP_NAMESPACE on the target cluster (no Argo CD restart)
+  local first_app=$(oc --kubeconfig="$kubeconfig" get applications -n "$FORCE_SYNC_APP_NAMESPACE" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+  if [[ -n "$first_app" ]]; then
+    echo "  Force syncing Application $first_app (namespace $FORCE_SYNC_APP_NAMESPACE) on $cluster..."
+    oc --kubeconfig="$kubeconfig" patch application "$first_app" -n "$FORCE_SYNC_APP_NAMESPACE" --type=merge -p='{"operation":{"sync":{"syncOptions":["CreateNamespace=true","PrunePropagationPolicy=foreground","PruneLast=true","Force=true"]}}}' &>/dev/null || true
+    echo "  ✅ Triggered force sync for $first_app"
+  else
+    echo "  ⚠️  No Applications found in $FORCE_SYNC_APP_NAMESPACE on $cluster - cannot force sync"
   fi
   
   # Trigger ArgoCD refresh/sync (argocd CLI needs --server when run inside the pod)

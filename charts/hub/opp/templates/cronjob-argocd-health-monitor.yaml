@@ -30,6 +30,8 @@ spec:
               value: {{ include "opp.primaryClusterName" . | quote }}
             - name: SECONDARY_CLUSTER
               value: {{ include "opp.secondaryClusterName" . | quote }}
+            - name: FORCE_SYNC_APP_NAMESPACE
+              value: {{ .Values.argocdHealthMonitor.forceSyncAppNamespace | default "gitops-vms" | quote }}
             command:
             - /bin/bash
             - -c
