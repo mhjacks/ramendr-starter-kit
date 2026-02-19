@@ -65,7 +65,12 @@ check_cluster_wedged() {
         return 0
       fi
     fi
-    
+
+    # For primary/secondary we require the cluster-specific Argo CD instance; missing = not healthy (job must not succeed)
+    if [[ "$cluster" == "$PRIMARY_CLUSTER" || "$cluster" == "$SECONDARY_CLUSTER" ]]; then
+      echo "❌ Required Argo CD instance ($cluster_argocd_instance in $cluster_argocd_namespace) not found on $cluster - job will retry or fail"
+      return 0
+    fi
     echo "✅ $cluster appears healthy (no ArgoCD instances installed yet)"
     return 1
   fi
@@ -139,7 +144,12 @@ check_cluster_wedged() {
         fi
       fi
     fi
-    
+
+    # For primary/secondary we require the Argo CD instance to be running; missing = not healthy (job must not succeed)
+    if [[ "$cluster" == "$PRIMARY_CLUSTER" || "$cluster" == "$SECONDARY_CLUSTER" ]]; then
+      echo "❌ Required Argo CD instance ($cluster_argocd_instance) not running in $cluster_argocd_namespace on $cluster - job will retry or fail"
+      return 0
+    fi
     echo "✅ $cluster appears healthy (no ArgoCD instances running yet)"
     return 1
   elif [[ $cluster_argocd_pods -eq 1 ]]; then
@@ -651,5 +661,7 @@ while [[ $attempt -le $MAX_ATTEMPTS ]]; do
   fi
 done
 
-echo "🎉 ArgoCD health monitoring completed"
-
+# Exited loop by exhausting attempts (did not exit 0 from "all healthy")
+echo "❌ ArgoCD health monitoring did not complete successfully within $MAX_ATTEMPTS attempts"
+echo "   One or both required Argo CD instances (on $PRIMARY_CLUSTER and $SECONDARY_CLUSTER) were not running correctly."
+exit 1
