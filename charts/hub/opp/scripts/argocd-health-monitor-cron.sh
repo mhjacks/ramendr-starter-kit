@@ -1,4 +1,8 @@
 #!/bin/bash
+# ArgoCD health monitor - CronJob (runs every 15 min).
+# Why two scripts? The Job (argocd-health-monitor.sh) runs once at deploy, retries until both clusters are
+# healthy then exits. This CronJob runs periodically to detect and remediate wedged clusters after deploy.
+# Both use the same remediation: force-sync Namespace ramendr-starter-kit-resilient in Application ramendr-starter-kit-resilient.
 set -euo pipefail
 
 echo "Starting ArgoCD health monitoring and remediation..."
@@ -13,6 +17,10 @@ SLEEP_INTERVAL=20
 ARGOCD_NAMESPACE="openshift-gitops"
 # Namespace where the Application to force-sync lives (parameterized; default gitops-vms)
 FORCE_SYNC_APP_NAMESPACE="${FORCE_SYNC_APP_NAMESPACE:-gitops-vms}"
+# Application and specific resource to force-sync when remediating (Namespace ramendr-starter-kit-resilient in Application ramendr-starter-kit-resilient)
+FORCE_SYNC_APP_NAME="${FORCE_SYNC_APP_NAME:-ramendr-starter-kit-resilient}"
+FORCE_SYNC_RESOURCE_KIND="${FORCE_SYNC_RESOURCE_KIND:-Namespace}"
+FORCE_SYNC_RESOURCE_NAME="${FORCE_SYNC_RESOURCE_NAME:-ramendr-starter-kit-resilient}"
 HEALTH_CHECK_TIMEOUT=30
 
 # Function to check if a cluster is wedged
@@ -107,16 +115,15 @@ remediate_wedged_cluster() {
   local cluster="$1"
   local kubeconfig="$2"
   
-  echo "🔧 Remediating wedged cluster: $cluster (forcibly resyncing an application)"
+  echo "🔧 Remediating wedged cluster: $cluster (forcibly resyncing resource $FORCE_SYNC_RESOURCE_KIND/$FORCE_SYNC_RESOURCE_NAME in Application $FORCE_SYNC_APP_NAME)"
   
-  # Forcibly resync an Application known to exist in FORCE_SYNC_APP_NAMESPACE on the target cluster (no Argo CD restart)
-  local first_app=$(oc --kubeconfig="$kubeconfig" get applications -n "$FORCE_SYNC_APP_NAMESPACE" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
-  if [[ -n "$first_app" ]]; then
-    echo "  Force syncing Application $first_app (namespace $FORCE_SYNC_APP_NAMESPACE) on $cluster..."
-    oc --kubeconfig="$kubeconfig" patch application "$first_app" -n "$FORCE_SYNC_APP_NAMESPACE" --type=merge -p='{"operation":{"sync":{"syncOptions":["CreateNamespace=true","PrunePropagationPolicy=foreground","PruneLast=true","Force=true"]}}}' &>/dev/null || true
-    echo "  ✅ Triggered force sync for $first_app"
+  # Forcibly resync the specific resource (e.g. Namespace ramendr-starter-kit-resilient) in the Application (no Argo CD restart)
+  if oc --kubeconfig="$kubeconfig" get application "$FORCE_SYNC_APP_NAME" -n "$FORCE_SYNC_APP_NAMESPACE" &>/dev/null; then
+    echo "  Force syncing resource $FORCE_SYNC_RESOURCE_KIND/$FORCE_SYNC_RESOURCE_NAME in Application $FORCE_SYNC_APP_NAME (namespace $FORCE_SYNC_APP_NAMESPACE) on $cluster..."
+    oc --kubeconfig="$kubeconfig" patch application "$FORCE_SYNC_APP_NAME" -n "$FORCE_SYNC_APP_NAMESPACE" --type=merge -p="{\"operation\":{\"sync\":{\"resources\":[{\"kind\":\"$FORCE_SYNC_RESOURCE_KIND\",\"name\":\"$FORCE_SYNC_RESOURCE_NAME\"}],\"syncOptions\":[\"Force=true\"]}}}" &>/dev/null || true
+    echo "  ✅ Triggered force sync for $FORCE_SYNC_RESOURCE_KIND/$FORCE_SYNC_RESOURCE_NAME"
   else
-    echo "  ⚠️  No Applications found in $FORCE_SYNC_APP_NAMESPACE on $cluster - cannot force sync"
+    echo "  ⚠️  Application $FORCE_SYNC_APP_NAME not found in $FORCE_SYNC_APP_NAMESPACE on $cluster - cannot force sync"
   fi
   
   # Trigger ArgoCD refresh/sync (argocd CLI needs --server when run inside the pod)

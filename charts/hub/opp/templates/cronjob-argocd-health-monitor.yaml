@@ -32,6 +32,12 @@ spec:
               value: {{ include "opp.secondaryClusterName" . | quote }}
             - name: FORCE_SYNC_APP_NAMESPACE
               value: {{ .Values.argocdHealthMonitor.forceSyncAppNamespace | default "gitops-vms" | quote }}
+            - name: FORCE_SYNC_APP_NAME
+              value: {{ .Values.argocdHealthMonitor.forceSyncAppName | default "ramendr-starter-kit-resilient" | quote }}
+            - name: FORCE_SYNC_RESOURCE_KIND
+              value: {{ .Values.argocdHealthMonitor.forceSyncResourceKind | default "Namespace" | quote }}
+            - name: FORCE_SYNC_RESOURCE_NAME
+              value: {{ .Values.argocdHealthMonitor.forceSyncResourceName | default "ramendr-starter-kit-resilient" | quote }}
             command:
             - /bin/bash
             - -c
