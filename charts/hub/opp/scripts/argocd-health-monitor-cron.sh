@@ -15,8 +15,8 @@ SECONDARY_CLUSTER="${SECONDARY_CLUSTER:-ocp-secondary}"
 MAX_ATTEMPTS=270  # Check 270 times (90 minutes with 20s intervals) before failing
 SLEEP_INTERVAL=20
 ARGOCD_NAMESPACE="openshift-gitops"
-# Namespace where the Application to force-sync lives (parameterized; default gitops-vms)
-FORCE_SYNC_APP_NAMESPACE="${FORCE_SYNC_APP_NAMESPACE:-gitops-vms}"
+# Namespace where the Application to force-sync lives (parameterized; default openshift-gitops)
+FORCE_SYNC_APP_NAMESPACE="${FORCE_SYNC_APP_NAMESPACE:-openshift-gitops}"
 # Application and specific resource to force-sync when remediating (Namespace ramendr-starter-kit-resilient in Application ramendr-starter-kit-resilient)
 FORCE_SYNC_APP_NAME="${FORCE_SYNC_APP_NAME:-ramendr-starter-kit-resilient}"
 FORCE_SYNC_RESOURCE_KIND="${FORCE_SYNC_RESOURCE_KIND:-Namespace}"

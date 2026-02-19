@@ -17,7 +17,7 @@ MAX_ATTEMPTS=180  # Check 180 times (90 minutes with 30s intervals) before faili
 SLEEP_INTERVAL=30
 ARGOCD_NAMESPACE="openshift-gitops"
 # Same as cron: force-sync this specific resource in this Application when remediating (parameterized)
-FORCE_SYNC_APP_NAMESPACE="${FORCE_SYNC_APP_NAMESPACE:-gitops-vms}"
+FORCE_SYNC_APP_NAMESPACE="${FORCE_SYNC_APP_NAMESPACE:-openshift-gitops}"
 FORCE_SYNC_APP_NAME="${FORCE_SYNC_APP_NAME:-ramendr-starter-kit-resilient}"
 FORCE_SYNC_RESOURCE_KIND="${FORCE_SYNC_RESOURCE_KIND:-Namespace}"
 FORCE_SYNC_RESOURCE_NAME="${FORCE_SYNC_RESOURCE_NAME:-ramendr-starter-kit-resilient}"
