@@ -6,7 +6,7 @@
 
 clusterOverrides:
   primary:
-    name: ocp-one
+    name: ocp-one-1
     version: 4.18.7
     install_config:
       metadata:
@@ -15,7 +15,7 @@ clusterOverrides:
         aws:
           region: us-west-1
   secondary:
-    name: ocp-two
+    name: ocp-two-1
     version: 4.18.7
     install_config:
       metadata:
