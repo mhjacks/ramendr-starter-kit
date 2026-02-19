@@ -11,3 +11,5 @@ regionalDR:
 
 argocdHealthMonitor:
   enabled: true
+  # Namespace containing the Argo CD Application to force-sync when remediating a wedged cluster (instead of restarting Argo CD)
+  forceSyncAppNamespace: gitops-vms
