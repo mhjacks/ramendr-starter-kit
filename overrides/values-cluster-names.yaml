@@ -10,7 +10,7 @@ clusterOverrides:
     version: 4.18.7
     install_config:
       metadata:
-        name: ocp-one
+        name: ocp-one-1
       platform:
         aws:
           region: us-west-1
@@ -19,11 +19,11 @@ clusterOverrides:
     version: 4.18.7
     install_config:
       metadata:
-        name: ocp-two
+        name: ocp-two-1
       platform:
         aws:
           region: us-east-1
 
 # DRPC overrides (preferredCluster defaults to primary if unset)
 drpc:
-  preferredCluster: ocp-one
+  preferredCluster: ocp-one-1
