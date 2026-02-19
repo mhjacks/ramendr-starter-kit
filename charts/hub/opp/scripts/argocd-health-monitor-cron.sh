@@ -158,23 +158,24 @@ remediate_wedged_cluster() {
     echo "  ⚠️  ArgoCD pods may not have fully restarted on $cluster"
   fi
   
-  # Trigger ArgoCD refresh/sync
+  # Trigger ArgoCD refresh/sync (argocd CLI needs --server when run inside the pod)
   echo "  Triggering ArgoCD refresh on $cluster..."
   local server_pod=$(oc --kubeconfig="$kubeconfig" get pods -n "$ARGOCD_NAMESPACE" -l app.kubernetes.io/name=openshift-gitops-server --field-selector=status.phase=Running -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+  local argocd_server="localhost:8080"
   if [[ -n "$server_pod" ]]; then
     # Trigger refresh of all applications
-    oc --kubeconfig="$kubeconfig" exec -n "$ARGOCD_NAMESPACE" "$server_pod" -- argocd app list -o name | while read app; do
+    oc --kubeconfig="$kubeconfig" exec -n "$ARGOCD_NAMESPACE" "$server_pod" -- argocd app list --server "$argocd_server" -o name 2>/dev/null | while read app; do
       if [[ -n "$app" ]]; then
         echo "    Refreshing $app..."
-        oc --kubeconfig="$kubeconfig" exec -n "$ARGOCD_NAMESPACE" "$server_pod" -- argocd app get "$app" --refresh &>/dev/null || true
+        oc --kubeconfig="$kubeconfig" exec -n "$ARGOCD_NAMESPACE" "$server_pod" -- argocd app get "$app" --server "$argocd_server" --refresh &>/dev/null || true
       fi
     done
-    
+
     # Trigger hard refresh
-    oc --kubeconfig="$kubeconfig" exec -n "$ARGOCD_NAMESPACE" "$server_pod" -- argocd app list -o name | while read app; do
+    oc --kubeconfig="$kubeconfig" exec -n "$ARGOCD_NAMESPACE" "$server_pod" -- argocd app list --server "$argocd_server" -o name 2>/dev/null | while read app; do
       if [[ -n "$app" ]]; then
         echo "    Hard refreshing $app..."
-        oc --kubeconfig="$kubeconfig" exec -n "$ARGOCD_NAMESPACE" "$server_pod" -- argocd app get "$app" --hard-refresh &>/dev/null || true
+        oc --kubeconfig="$kubeconfig" exec -n "$ARGOCD_NAMESPACE" "$server_pod" -- argocd app get "$app" --server "$argocd_server" --hard-refresh &>/dev/null || true
       fi
     done
   fi
