@@ -94,7 +94,53 @@ get_target_cluster_from_placement() {
   return 0
 }
 
+# Function to get kubeconfig for a managed cluster to a specific file (does not change KUBECONFIG; use for read-only checks)
+get_cluster_kubeconfig_to_file() {
+  local cluster="$1"
+  local output_path="$2"
+  echo "  Getting kubeconfig for $cluster (from hub) -> $output_path"
+  local secret_names=("${cluster}-admin-kubeconfig" "admin-kubeconfig" "import-kubeconfig")
+  for secret_name in "${secret_names[@]}"; do
+    if oc get secret "$secret_name" -n "$cluster" -o jsonpath='{.data.kubeconfig}' 2>/dev/null | \
+       base64 -d > "$output_path" 2>/dev/null && [[ -s "$output_path" ]]; then
+      if KUBECONFIG="$output_path" oc get nodes &>/dev/null; then
+        echo "  ✅ Retrieved kubeconfig for $cluster"
+        return 0
+      fi
+    fi
+  done
+  if oc get secret -n "$cluster" -o name 2>/dev/null | grep -E "(admin-kubeconfig|kubeconfig)" | head -1 | \
+     xargs -I {} oc get {} -n "$cluster" -o jsonpath='{.data.kubeconfig}' 2>/dev/null | \
+     base64 -d > "$output_path" 2>/dev/null && [[ -s "$output_path" ]]; then
+    if KUBECONFIG="$output_path" oc get nodes &>/dev/null; then
+      echo "  ✅ Retrieved kubeconfig for $cluster"
+      return 0
+    fi
+  fi
+  echo "  ⚠️  Could not get kubeconfig for $cluster"
+  return 1
+}
+
+# Function to check if any resource from resources-list.txt exists on the cluster (using given kubeconfig)
+# Returns 0 if at least one resource exists, 1 otherwise
+any_resource_exists_on_cluster() {
+  local kubeconfig_path="$1"
+  if [[ ! -s "$WORK_DIR/resources-list.txt" ]]; then
+    return 1
+  fi
+  while IFS='|' read -r kind name namespace; do
+    if [[ -z "$kind" || -z "$name" ]]; then
+      continue
+    fi
+    if KUBECONFIG="$kubeconfig_path" oc get "$kind" "$name" -n "$VM_NAMESPACE" -o jsonpath='{.metadata.name}' &>/dev/null; then
+      return 0
+    fi
+  done < "$WORK_DIR/resources-list.txt"
+  return 1
+}
+
 # Function to get kubeconfig for target managed cluster (run from hub; secrets are in hub namespace <cluster>)
+# Exports KUBECONFIG for subsequent oc commands (use for deploy target)
 get_target_cluster_kubeconfig() {
   local cluster="$1"
   echo "Getting kubeconfig for target managed cluster: $cluster (from hub cluster)"
@@ -146,38 +192,6 @@ if get_target_cluster_from_placement; then
   echo "  Target cluster: $TARGET_CLUSTER"
 else
   echo "  Using default target cluster: $TARGET_CLUSTER"
-fi
-
-# Get kubeconfig for target cluster (must succeed so we do not deploy to hub by mistake)
-if ! get_target_cluster_kubeconfig "$TARGET_CLUSTER"; then
-  echo "  ❌ Error: Could not get kubeconfig for target cluster $TARGET_CLUSTER"
-  echo "  Deployment must run against the primary/target cluster, not the hub."
-  echo "  Ensure the hub can read the kubeconfig secret for $TARGET_CLUSTER (e.g. admin-kubeconfig in namespace $TARGET_CLUSTER)."
-  exit 1
-fi
-
-# Verify we're on the target cluster, not the hub
-CURRENT_CLUSTER=$(oc config view --minify -o jsonpath='{.contexts[0].context.cluster}' 2>/dev/null || echo "")
-echo "Current cluster context: $CURRENT_CLUSTER"
-echo "Target cluster for deployment: $TARGET_CLUSTER"
-# Refuse if we're still on hub (in-cluster or local-cluster context)
-if [[ "$CURRENT_CLUSTER" == "in-cluster" || "$CURRENT_CLUSTER" == "local-cluster" ]]; then
-  echo "  ❌ Error: Current context is the hub (${CURRENT_CLUSTER}), not target $TARGET_CLUSTER. Refusing to deploy."
-  exit 1
-fi
-
-# Ensure the gitops-vms namespace exists on the target cluster
-echo ""
-echo "Ensuring namespace $VM_NAMESPACE exists on target cluster..."
-if oc get namespace "$VM_NAMESPACE" &>/dev/null; then
-  echo "  ✅ Namespace $VM_NAMESPACE already exists"
-else
-  echo "  Creating namespace $VM_NAMESPACE..."
-  if oc create namespace "$VM_NAMESPACE" 2>&1; then
-    echo "  ✅ Namespace $VM_NAMESPACE created successfully"
-  else
-    echo "  ⚠️  Warning: Failed to create namespace $VM_NAMESPACE (may already exist or insufficient permissions)"
-  fi
 fi
 
 # Step 1: Check for helm and install if needed
@@ -313,16 +327,8 @@ if [[ $VM_COUNT -eq 0 && $SERVICE_COUNT -eq 0 && $ROUTE_COUNT -eq 0 && $EXTERNAL
   echo "  Note: These resources are optional - will proceed with applying the template anyway"
 fi
 
-# Step 4: Check if resources already exist
-echo ""
-echo "Step 4: Checking if resources already exist..."
-
-ALL_EXIST=true
-MISSING_RESOURCES=()
-
-# Parse resources and check if they exist
+# Build resources list (kind|name|namespace) for existence checks on each cluster
 if [[ -s "$WORK_DIR/helm-output.yaml" ]]; then
-  # Extract each resource and check if it exists
   awk '
     BEGIN { 
       RS="---"
@@ -331,11 +337,7 @@ if [[ -s "$WORK_DIR/helm-output.yaml" ]]; then
     {
       resource=$0
       if (resource ~ /^kind: (VirtualMachine|Service|Route|ExternalSecret)$/ || resource ~ /kind: VirtualMachine/ || resource ~ /kind: Service/ || resource ~ /kind: Route/ || resource ~ /kind: ExternalSecret/) {
-        # Extract kind, name, and namespace
-        kind=""
-        name=""
-        namespace=""
-        
+        kind=""; name=""; namespace=""
         split(resource, lines, "\n")
         for (i=1; i<=length(lines); i++) {
           if (lines[i] ~ /^kind:/) {
@@ -354,25 +356,87 @@ if [[ -s "$WORK_DIR/helm-output.yaml" ]]; then
             namespace=parts[2]
           }
         }
-        
         if (kind != "" && name != "") {
           print kind "|" name "|" namespace
         }
       }
     }
   ' "$WORK_DIR/helm-output.yaml" > "$WORK_DIR/resources-list.txt"
-  
-  # Check each resource in the gitops-vms namespace (all resources should be in gitops-vms)
+else
+  : > "$WORK_DIR/resources-list.txt"
+fi
+
+# Step 3b: Check both primary and secondary for existing resources — skip deploy if found on either (avoid race during failover/Argo sync)
+echo ""
+echo "Step 3b: Checking primary and secondary clusters for existing resources (skip deploy if found on either)..."
+RESOURCES_FOUND_ON_OTHER_CLUSTER=false
+for cluster in "$PRIMARY_CLUSTER" "$SECONDARY_CLUSTER"; do
+  kubeconfig_file="$WORK_DIR/kubeconfig-$cluster.yaml"
+  if get_cluster_kubeconfig_to_file "$cluster" "$kubeconfig_file"; then
+    if any_resource_exists_on_cluster "$kubeconfig_file"; then
+      echo "  ✅ At least one resource (VM/Service/Route/ExternalSecret) already exists on $cluster"
+      RESOURCES_FOUND_ON_OTHER_CLUSTER=true
+      break
+    fi
+    echo "  No resources found on $cluster"
+  else
+    echo "  ⚠️  Could not get kubeconfig for $cluster — skipping check for this cluster"
+  fi
+done
+if [[ "$RESOURCES_FOUND_ON_OTHER_CLUSTER" == "true" ]]; then
+  echo ""
+  echo "  Resources already exist on primary or secondary (failover or Argo sync may be in progress)."
+  echo "  Skipping deployment to avoid race conditions."
+  exit 0
+fi
+echo "  No resources found on primary or secondary — will proceed with placement target check and deploy if needed."
+
+# Get kubeconfig for target cluster (must succeed so we do not deploy to hub by mistake)
+if ! get_target_cluster_kubeconfig "$TARGET_CLUSTER"; then
+  echo "  ❌ Error: Could not get kubeconfig for target cluster $TARGET_CLUSTER"
+  echo "  Deployment must run against the primary/target cluster, not the hub."
+  echo "  Ensure the hub can read the kubeconfig secret for $TARGET_CLUSTER (e.g. admin-kubeconfig in namespace $TARGET_CLUSTER)."
+  exit 1
+fi
+
+# Verify we're on the target cluster, not the hub
+CURRENT_CLUSTER=$(oc config view --minify -o jsonpath='{.contexts[0].context.cluster}' 2>/dev/null || echo "")
+echo "Current cluster context: $CURRENT_CLUSTER"
+echo "Target cluster for deployment: $TARGET_CLUSTER"
+# Refuse if we're still on hub (in-cluster or local-cluster context)
+if [[ "$CURRENT_CLUSTER" == "in-cluster" || "$CURRENT_CLUSTER" == "local-cluster" ]]; then
+  echo "  ❌ Error: Current context is the hub (${CURRENT_CLUSTER}), not target $TARGET_CLUSTER. Refusing to deploy."
+  exit 1
+fi
+
+# Ensure the gitops-vms namespace exists on the target cluster
+echo ""
+echo "Ensuring namespace $VM_NAMESPACE exists on target cluster..."
+if oc get namespace "$VM_NAMESPACE" &>/dev/null; then
+  echo "  ✅ Namespace $VM_NAMESPACE already exists"
+else
+  echo "  Creating namespace $VM_NAMESPACE..."
+  if oc create namespace "$VM_NAMESPACE" 2>&1; then
+    echo "  ✅ Namespace $VM_NAMESPACE created successfully"
+  else
+    echo "  ⚠️  Warning: Failed to create namespace $VM_NAMESPACE (may already exist or insufficient permissions)"
+  fi
+fi
+
+# Step 4: Check if resources already exist on the target (placement) cluster
+echo ""
+echo "Step 4: Checking if resources already exist on target cluster ($TARGET_CLUSTER)..."
+
+ALL_EXIST=true
+MISSING_RESOURCES=()
+
+if [[ -s "$WORK_DIR/resources-list.txt" ]]; then
   while IFS='|' read -r kind name namespace; do
     if [[ -z "$kind" || -z "$name" ]]; then
       continue
     fi
-    
-    # All resources (VMs, Services, Routes) should be in gitops-vms namespace
     check_namespace="$VM_NAMESPACE"
-    
     echo "  Checking $kind/$name in namespace: $check_namespace"
-    
     if check_resource_exists "" "$kind" "$check_namespace" "$name"; then
       echo "    ✅ $kind/$name exists in namespace $check_namespace"
     else
@@ -381,15 +445,9 @@ if [[ -s "$WORK_DIR/helm-output.yaml" ]]; then
       MISSING_RESOURCES+=("$kind/$name in namespace $check_namespace")
     fi
   done < "$WORK_DIR/resources-list.txt"
-  
-  if [[ ! -s "$WORK_DIR/resources-list.txt" ]]; then
-    echo "  ⚠️  Warning: No VMs, Services, Routes, or ExternalSecrets found in helm template"
-    echo "  Note: These resources are optional - will proceed with applying the template"
-    ALL_EXIST=false
-  fi
 else
-  echo "  ⚠️  Warning: Helm output file is empty"
-  echo "  Will proceed with applying the template"
+  echo "  ⚠️  Warning: No VMs, Services, Routes, or ExternalSecrets found in helm template"
+  echo "  Note: These resources are optional - will proceed with applying the template"
   ALL_EXIST=false
 fi
 
