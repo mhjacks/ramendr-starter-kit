@@ -93,7 +93,7 @@ clusterGroup:
       namespace: golang-external-secrets
       project: resilient
       chart: golang-external-secrets
-      chartVersion: 0.1.*
+      chartVersion: 0.2.*
 
     openshift-cnv:
       name: openshift-cnv
