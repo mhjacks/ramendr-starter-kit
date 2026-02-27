@@ -6,6 +6,12 @@ global:
 edgeGitopsVms:
   chartVersion: "0.2.10"
 
+submariner:
+  instanceType: c5d.large
+  ipsecNatPort: 4500
+  NATTEnable: true
+  cableDriver: libreswan
+
 # Minimal overrides for cluster names, versions, regions (e.g. overrides/values-cluster-names.yaml).
 # Merge override file FIRST so full regionalDR stays here and only clusterOverrides are applied.
 # clusterOverrides:
