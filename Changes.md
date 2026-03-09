@@ -5,7 +5,7 @@ v1.0 - November 2025
 * Arrange to default baseDomain settings appropriately so that forking the pattern is not a hard requirement
 * Initial release
 
-v1.1 - February 2026
+v1.0 - February 2026
 
 * The names ocp-primary and ocp-secondary were hardcoded in various places, which caused issues when trying
 to install two copies of this pattern into the same DNS domain.
