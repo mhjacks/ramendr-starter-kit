@@ -16,7 +16,7 @@ metadata:
   name: {{ $cluster.name }}
 
 ---
-apiVersion: external-secrets.io/v1beta1
+apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:
   name: {{ $cluster.name }}-cluster-private-key
@@ -28,9 +28,9 @@ spec:
     - extract:
         conversionStrategy: Default
         decodingStrategy: None
-        key: secret/hub/privatekey
+        key: secret/hub/aws
         metadataPolicy: None
-  refreshInterval: 24h0m0s
+  refreshInterval: 90s
   secretStoreRef:
     kind: ClusterSecretStore
     name: vault-backend
@@ -44,7 +44,7 @@ spec:
       type: Opaque
 
 ---
-apiVersion: external-secrets.io/v1beta1
+apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:
   name: {{ $cluster.name }}-cluster-pull-secret
@@ -58,7 +58,7 @@ spec:
         decodingStrategy: None
         key: secret/hub/openshiftPullSecret
         metadataPolicy: None
-  refreshInterval: 24h0m0s
+  refreshInterval: 90s
   secretStoreRef:
     kind: ClusterSecretStore
     name: vault-backend
@@ -72,7 +72,7 @@ spec:
       type: Opaque
 
 ---
-apiVersion: external-secrets.io/v1beta1
+apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:
   name: {{ $cluster.name }}-cluster-aws-creds
