@@ -11,9 +11,19 @@ regionalDR:
 
 argocdHealthMonitor:
   enabled: true
-  # When remediating a wedged cluster, force-sync this specific resource in this Application (instead of restarting Argo CD)
+  # When remediating a wedged cluster, force-sync these resources in the Application (instead of restarting Argo CD)
   forceSyncAppNamespace: openshift-gitops
   forceSyncAppName: ramendr-starter-kit-resilient
-  # Specific resource to sync: the Namespace (kind/name) in the application above
+  # List of resources to force-sync (kind + name). First should be the imperative Namespace (exists in any validated pattern).
+  # Additional namespaces can be taken from values-<clusterGroup>.yaml (clusterGroup.namespaces) at deploy time.
+  forceSyncResources:
+    - kind: Namespace
+      name: ramendr-starter-kit-resilient
+    # Example: add more Namespace resources from values-<clusterGroup>.yaml clusterGroup.namespaces
+    # - kind: Namespace
+    #   name: gitops-vms
+    # - kind: Namespace
+    #   name: openshift-cnv
+  # Legacy single-resource defaults (used only if forceSyncResources is empty)
   forceSyncResourceKind: Namespace
   forceSyncResourceName: ramendr-starter-kit-resilient

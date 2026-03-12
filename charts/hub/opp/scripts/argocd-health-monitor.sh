@@ -16,7 +16,10 @@ SECONDARY_CLUSTER="${SECONDARY_CLUSTER:-ocp-secondary}"
 MAX_ATTEMPTS=180  # Check 180 times (90 minutes with 30s intervals) before failing
 SLEEP_INTERVAL=30
 ARGOCD_NAMESPACE="openshift-gitops"
-# Same as cron: force-sync this specific resource in this Application when remediating (parameterized)
+# Same as cron: force-sync one or more resources in this Application when remediating (parameterized)
+# FORCE_SYNC_RESOURCES: JSON array of {kind, name} (e.g. [{"kind":"Namespace","name":"ramendr-starter-kit-resilient"},...])
+#   Includes the imperative Namespace plus optional namespaces from values-<clusterGroup>.yaml clusterGroup.namespaces
+# Legacy single-resource vars used when FORCE_SYNC_RESOURCES is empty
 FORCE_SYNC_APP_NAMESPACE="${FORCE_SYNC_APP_NAMESPACE:-openshift-gitops}"
 FORCE_SYNC_APP_NAME="${FORCE_SYNC_APP_NAME:-ramendr-starter-kit-resilient}"
 FORCE_SYNC_RESOURCE_KIND="${FORCE_SYNC_RESOURCE_KIND:-Namespace}"
@@ -194,19 +197,35 @@ check_cluster_wedged() {
   fi
 }
 
-# Function to remediate a wedged cluster (force sync the specific resource in the specific Application, same as cron)
+# Function to remediate a wedged cluster (force sync one or more resources in the Application, same as cron)
 remediate_wedged_cluster() {
   local cluster="$1"
   local kubeconfig="$2"
   
-  echo "🔧 Remediating wedged cluster: $cluster (forcibly resyncing resource $FORCE_SYNC_RESOURCE_KIND/$FORCE_SYNC_RESOURCE_NAME in Application $FORCE_SYNC_APP_NAME)"
-  
-  if oc --kubeconfig="$kubeconfig" get application "$FORCE_SYNC_APP_NAME" -n "$FORCE_SYNC_APP_NAMESPACE" &>/dev/null; then
-    echo "  Force syncing resource $FORCE_SYNC_RESOURCE_KIND/$FORCE_SYNC_RESOURCE_NAME in Application $FORCE_SYNC_APP_NAME (namespace $FORCE_SYNC_APP_NAMESPACE) on $cluster..."
-    oc --kubeconfig="$kubeconfig" patch application "$FORCE_SYNC_APP_NAME" -n "$FORCE_SYNC_APP_NAMESPACE" --type=merge -p="{\"operation\":{\"sync\":{\"resources\":[{\"kind\":\"$FORCE_SYNC_RESOURCE_KIND\",\"name\":\"$FORCE_SYNC_RESOURCE_NAME\"}],\"syncOptions\":[\"Force=true\"]}}}" &>/dev/null || true
-    echo "  ✅ Triggered force sync for $FORCE_SYNC_RESOURCE_KIND/$FORCE_SYNC_RESOURCE_NAME"
-  else
+  if ! oc --kubeconfig="$kubeconfig" get application "$FORCE_SYNC_APP_NAME" -n "$FORCE_SYNC_APP_NAMESPACE" &>/dev/null; then
     echo "  ⚠️  Application $FORCE_SYNC_APP_NAME not found in $FORCE_SYNC_APP_NAMESPACE on $cluster - cannot force sync"
+    return
+  fi
+
+  # Prefer FORCE_SYNC_RESOURCES (JSON array); fallback to single resource
+  local patch_payload
+  if [[ -n "${FORCE_SYNC_RESOURCES:-}" ]] && command -v jq &>/dev/null; then
+    if echo "$FORCE_SYNC_RESOURCES" | jq -e '. | type == "array" and length > 0' &>/dev/null; then
+      patch_payload=$(echo "$FORCE_SYNC_RESOURCES" | jq -c '{operation: {sync: {resources: ., syncOptions: ["Force=true"]}}}')
+      echo "🔧 Remediating wedged cluster: $cluster (force-syncing $(echo "$FORCE_SYNC_RESOURCES" | jq 'length') resource(s) in Application $FORCE_SYNC_APP_NAME)"
+      echo "  Resources: $(echo "$FORCE_SYNC_RESOURCES" | jq -r '.[] | "\(.kind)/\(.name)"' | tr '\n' ' ')"
+    fi
+  fi
+  if [[ -z "${patch_payload:-}" ]]; then
+    patch_payload="{\"operation\":{\"sync\":{\"resources\":[{\"kind\":\"$FORCE_SYNC_RESOURCE_KIND\",\"name\":\"$FORCE_SYNC_RESOURCE_NAME\"}],\"syncOptions\":[\"Force=true\"]}}}"
+    echo "🔧 Remediating wedged cluster: $cluster (force-syncing resource $FORCE_SYNC_RESOURCE_KIND/$FORCE_SYNC_RESOURCE_NAME in Application $FORCE_SYNC_APP_NAME)"
+  fi
+
+  echo "  Force syncing in Application $FORCE_SYNC_APP_NAME (namespace $FORCE_SYNC_APP_NAMESPACE) on $cluster..."
+  if oc --kubeconfig="$kubeconfig" patch application "$FORCE_SYNC_APP_NAME" -n "$FORCE_SYNC_APP_NAMESPACE" --type=merge -p="$patch_payload" &>/dev/null; then
+    echo "  ✅ Triggered force sync"
+  else
+    echo "  ⚠️  Force sync patch may have failed"
   fi
 }
 

@@ -11,3 +11,11 @@
 {{- $fromOver := index $over "name" -}}
 {{- if $fromOver }}{{ $fromOver }}{{- else if and .Values.regionalDR (index .Values.regionalDR 0) }}{{ (index .Values.regionalDR 0).clusters.secondary.name | default "ocp-secondary" }}{{- else }}ocp-secondary{{ end -}}
 {{- end -}}
+
+{{/* JSON array of force-sync resources (kind/name). Uses forceSyncResources if non-empty, else single legacy resource. */}}
+{{- define "opp.forceSyncResourcesJson" -}}
+{{- $kind := .Values.argocdHealthMonitor.forceSyncResourceKind | default "Namespace" -}}
+{{- $name := .Values.argocdHealthMonitor.forceSyncResourceName | default "ramendr-starter-kit-resilient" -}}
+{{- $defaultList := list (dict "kind" $kind "name" $name) -}}
+{{- (.Values.argocdHealthMonitor.forceSyncResources | default $defaultList) | toJson -}}
+{{- end -}}
