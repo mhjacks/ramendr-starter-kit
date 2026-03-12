@@ -6,6 +6,15 @@ global:
 edgeGitopsVms:
   chartVersion: "0.2.10"
 
+secretStore:
+  name: vault-backend
+  kind: ClusterSecretStore
+
+clusterDeployments:
+  awsSecretKey: secret/hub/aws
+  pullSecretKey: secret/hub/openshiftPullSecret
+  secretRefreshInterval: 90s
+
 submariner:
   instanceType: c5d.large
   ipsecNatPort: 4500
