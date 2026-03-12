@@ -28,12 +28,12 @@ spec:
     - extract:
         conversionStrategy: Default
         decodingStrategy: None
-        key: secret/hub/aws
+        key: {{ $.Values.clusterDeployments.awsSecretKey }}
         metadataPolicy: None
-  refreshInterval: 90s
+  refreshInterval: {{ $.Values.clusterDeployments.secretRefreshInterval }}
   secretStoreRef:
-    kind: ClusterSecretStore
-    name: vault-backend
+    kind: {{ $.Values.secretStore.kind }}
+    name: {{ $.Values.secretStore.name }}
   target:
     creationPolicy: Owner
     deletionPolicy: Retain
@@ -56,12 +56,12 @@ spec:
     - extract:
         conversionStrategy: Default
         decodingStrategy: None
-        key: secret/hub/openshiftPullSecret
+        key: {{ $.Values.clusterDeployments.pullSecretKey }}
         metadataPolicy: None
-  refreshInterval: 90s
+  refreshInterval: {{ $.Values.clusterDeployments.secretRefreshInterval }}
   secretStoreRef:
-    kind: ClusterSecretStore
-    name: vault-backend
+    kind: {{ $.Values.secretStore.kind }}
+    name: {{ $.Values.secretStore.name }}
   target:
     creationPolicy: Owner
     deletionPolicy: Retain
@@ -84,12 +84,12 @@ spec:
     - extract:
         conversionStrategy: Default
         decodingStrategy: None
-        key: secret/hub/aws
+        key: {{ $.Values.clusterDeployments.awsSecretKey }}
         metadataPolicy: None
-  refreshInterval: 24h0m0s
+  refreshInterval: {{ $.Values.clusterDeployments.secretRefreshInterval }}
   secretStoreRef:
-    kind: ClusterSecretStore
-    name: vault-backend
+    kind: {{ $.Values.secretStore.kind }}
+    name: {{ $.Values.secretStore.name }}
   target:
     creationPolicy: Owner
     deletionPolicy: Retain
