@@ -79,7 +79,9 @@ clusterGroup:
       name: opp-policy
       namespace: openshift
       project: opp
-      path: charts/hub/opp
+      repoURL: https://github.com/validatedpatterns/opp-policy-chart.git
+      chartVersion: main
+      path: "."
       annotations:
         argocd.argoproj.io/sync-wave: "5"
       syncPolicy:
@@ -108,7 +110,9 @@ clusterGroup:
       name: regional-dr
       namespace: regional-dr
       project: opp
-      path: charts/hub/rdr
+      repoURL: https://github.com/validatedpatterns/regionaldr-with-virt-chart.git
+      chartVersion: main
+      path: "."
       annotations:
         argocd.argoproj.io/sync-wave: "10"
       syncPolicy:
