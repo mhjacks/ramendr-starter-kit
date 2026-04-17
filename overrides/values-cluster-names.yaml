@@ -6,31 +6,31 @@
 
 clusterOverrides:
   primary:
-    name: ocp-primary
+    name: ocp-p1
     version: 4.20.6
     install_config:
       metadata:
-        name: ocp-primary
+        name: ocp-p1
       platform:
         aws:
           region: us-west-1
   secondary:
-    name: ocp-secondary
+    name: ocp-s1
     version: 4.20.6
     install_config:
       metadata:
-        name: ocp-secondary
+        name: ocp-s1
       platform:
         aws:
           region: us-east-1
 
 # DRPC overrides (preferredCluster defaults to primary if unset)
 drpc:
-  preferredCluster: ocp-primary
+  preferredCluster: ocp-p1
 
 # Set this to "true", provision clusters, and add their kubeconfigs
 # as described in the values-secret template; then run
 # ./pattern.sh make install-byoc.
 # That target will run a validation play to ensure the cluster
 # setup will work with ramen patterns
-byoc: true
+byoc: false
