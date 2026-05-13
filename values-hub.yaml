@@ -111,7 +111,7 @@ clusterGroup:
       namespace: regional-dr
       project: opp
       repoURL: https://github.com/mhjacks/regionaldr-with-virt-chart.git
-      chartVersion: aws_conditionalize
+      chartVersion: really_fix_sg_issues
       path: "."
       annotations:
         argocd.argoproj.io/sync-wave: "10"
