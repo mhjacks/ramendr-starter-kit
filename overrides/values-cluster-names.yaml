@@ -10,7 +10,7 @@ clusterOverrides:
     version: 4.22.1
     install_config:
       metadata:
-        name: mhj-rdr-v12-p
+        name: mhj-rdr-v12a-p
       platform:
         aws:
           region: us-west-1
@@ -19,7 +19,7 @@ clusterOverrides:
     version: 4.22.1
     install_config:
       metadata:
-        name: mhj-rdr-v12-s
+        name: mhj-rdr-v12a-s
       platform:
         aws:
           region: us-east-1
