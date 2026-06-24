@@ -115,7 +115,7 @@ clusterGroup:
       name: adp-data-protection-application
       namespace: openshift-adp
       argoProject: resilient
-      chart: oadp-data-protection-application
+      chart: data-protection-application
       chartVersion: 0.0.*
 
   managedClusterGroups: []
