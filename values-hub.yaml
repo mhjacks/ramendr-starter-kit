@@ -115,10 +115,8 @@ clusterGroup:
       name: regional-dr
       namespace: regional-dr
       argoProject: opp
-      # repoURL: https://github.com/validatedpatterns/regionaldr-with-virt-chart.git
-      # chartVersion: main
-      repoURL: https://github.com/mhjacks/regionaldr-with-virt-chart.git
-      chartVersion: add-managedclustersetbinding
+      repoURL: https://github.com/validatedpatterns/regionaldr-with-virt-chart.git
+      chartVersion: main
       path: "."
       annotations:
         argocd.argoproj.io/sync-wave: "10"
