@@ -84,7 +84,7 @@ clusterGroup:
       name: opp-policy
       namespace: openshift
       argoProject: opp
-      chart: opp-policy
+      chart: opp-policy-chart
       chartVersion: 0.0.*
       path: "."
       annotations:
