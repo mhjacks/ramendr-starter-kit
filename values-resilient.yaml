@@ -14,7 +14,6 @@ clusterGroup:
     policies: {}
     gitops-vms: {}
     external-dns-operator: {}
-    cert-manager-operator: {}
     external-secrets-operator:
       operatorGroup: true
       targetNamespaces: []
@@ -142,15 +141,5 @@ clusterGroup:
       argoProject: resilient
       chart: data-protection-application
       chartVersion: 0.0.*
-
-    vp-manage-proxy-cluster-ca:
-      name: vp-manage-proxy-cluster-ca
-      namespace: openshift-config
-      argoProject: resilient
-      repoURL: https://github.com/mhjacks/vp-manage-proxy-cluster-ca-chart
-      path: .
-      chartVersion: refactor/trust-manager-bundle
-      extraValueFiles:
-        - '$patternref/overrides/values-vp-manage-proxy-cluster-ca.yaml'
 
   managedClusterGroups: []
