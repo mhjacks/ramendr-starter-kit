@@ -1,4 +1,0 @@
----
-# Disable legacy opp-policy SSL extraction; vp-manage-proxy-cluster-ca owns cluster-proxy-ca-bundle.
-odfSslCertificateExtractor:
-  enabled: false

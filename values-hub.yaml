@@ -109,9 +109,9 @@ clusterGroup:
       name: opp-policy
       namespace: openshift
       argoProject: opp
-      repoURL: https://github.com/mhjacks/opp-policy-chart
-      path: .
-      chartVersion: disable-odf-ssl-extraction
+      chart: opp-policy-chart
+      chartVersion: 0.0.*
+      path: "."
       annotations:
         argocd.argoproj.io/sync-wave: "5"
       syncPolicy:
@@ -130,20 +130,43 @@ clusterGroup:
           - ServerSideApply=true
       extraValueFiles:
         - '/overrides/values-cluster-names.yaml'
-        - '$patternref/overrides/values-opp-policy.yaml'
       ignoreDifferences:
       - group: operators.openshift.io
         kind: Console
         jsonPointers:
           - /spec/plugins
 
+    # ODF DR infrastructure (Submariner, MirrorPeer, prerequisites, Ramen trusted-CA).
+    # Upstream v0.0.2+ moved this out of opp-policy and regionaldr-with-virt.
+    odf-dr:
+      name: odf-dr
+      namespace: cluster-ca-mgt
+      argoProject: opp
+      repoURL: https://github.com/mhjacks/odf-dr-chart
+      path: .
+      chartVersion: vp-manage-proxy-cluster-ca
+      annotations:
+        argocd.argoproj.io/sync-wave: "6"
+      syncPolicy:
+        automated: {}
+        retry:
+          limit: 60
+          backoff:
+            duration: 5s
+            factor: 2
+            maxDuration: 3m
+        syncOptions:
+          - RespectIgnoreDifferences=true
+      extraValueFiles:
+        - '/overrides/values-cluster-names.yaml'
+        - '$patternref/overrides/values-odf-dr-trust.yaml'
+
     rdr:
       name: regional-dr
       namespace: regional-dr
       argoProject: opp
-      repoURL: https://github.com/mhjacks/regionaldr-with-virt-chart
-      path: .
-      chartVersion: disable-odf-ramen-trusted-ca
+      chart: regionaldr-with-virt
+      chartVersion: 0.0.*
       annotations:
         argocd.argoproj.io/sync-wave: "10"
       syncPolicy:
@@ -160,7 +183,6 @@ clusterGroup:
       extraValueFiles:
         - '/overrides/values-cluster-names.yaml'
         - '/overrides/values-egv-dr.yaml'
-        - '$patternref/overrides/values-regionaldr-trust.yaml'
       ignoreDifferences:
         # Prevent ArgoCD from pruning dynamically created OCM resources
         # These resources are created by OCM operators and should never be pruned

@@ -1,0 +1,13 @@
+---
+# vp-manage-proxy-cluster-ca owns cluster-proxy-ca-bundle; skip legacy SSL extraction.
+odfSslCertificateExtractor:
+  enabled: false
+
+# odf-ramen-trusted-ca copies cluster-proxy-ca-bundle into ramen-hub-operator-config
+# s3StoreProfiles.caCertificates so Velero/OADP AWS_CA_BUNDLE is valid.
+odfRamenTrustedCa:
+  enabled: true
+
+# vp-manage merges PEM without legacy "# CA from …" comment markers.
+odfDrPrerequisites:
+  caMaterialMode: trust-bundle

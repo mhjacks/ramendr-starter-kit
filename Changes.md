@@ -49,9 +49,10 @@ v1.3 (exploration) - test_new_cluster_truster branch
 * Override `configMapName: cluster-proxy-ca-bundle` so prerequisites checks keep working.
 * **byNamespaceNameBundle** injects merged trust into `openshift-config`, `openshift-gitops`, and
   `openshift-adp` (label-based opt-in disabled).
-* **opp-policy** from git (`mhjacks/opp-policy-chart`, branch `disable-odf-ssl-extraction`):
-  `odfSslCertificateExtractor.enabled: false`.
-* **regionaldr** from git (`mhjacks/regionaldr-with-virt-chart`, branch `disable-odf-ramen-trusted-ca`):
+* Rebased on upstream **opp-policy-chart** `0.0.*` and **regionaldr-with-virt** `0.0.*`
+  (ODF/SSL/CA workloads moved to standalone **odf-dr-chart** in those releases).
+* **odf-dr** from git (`mhjacks/odf-dr-chart`, branch `vp-manage-proxy-cluster-ca`):
+  `odfSslCertificateExtractor.enabled: false`;
   `odfDrPrerequisites.caMaterialMode: trust-bundle` (no legacy `# CA from hub-ca` markers);
   **`odfRamenTrustedCa` stays enabled** — patches Ramen `s3StoreProfiles` from vp-manage's
   `cluster-proxy-ca-bundle` so Velero BSL `caCert` / `AWS_CA_BUNDLE` is valid (trust bundles
