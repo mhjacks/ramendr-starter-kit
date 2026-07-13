@@ -52,5 +52,7 @@ v1.3 (exploration) - test_new_cluster_truster branch
 * **opp-policy** from git (`mhjacks/opp-policy-chart`, branch `disable-odf-ssl-extraction`):
   `odfSslCertificateExtractor.enabled: false`.
 * **regionaldr** from git (`mhjacks/regionaldr-with-virt-chart`, branch `disable-odf-ramen-trusted-ca`):
-  `odfRamenTrustedCa.enabled: false` (no Ramen s3StoreProfiles CA injection);
-  `odfDrPrerequisites.caMaterialMode: trust-bundle` (no legacy `# CA from hub-ca` markers).
+  `odfDrPrerequisites.caMaterialMode: trust-bundle` (no legacy `# CA from hub-ca` markers);
+  **`odfRamenTrustedCa` stays enabled** — patches Ramen `s3StoreProfiles` from vp-manage's
+  `cluster-proxy-ca-bundle` so Velero BSL `caCert` / `AWS_CA_BUNDLE` is valid (trust bundles
+  in `openshift-adp` do not replace that path).
