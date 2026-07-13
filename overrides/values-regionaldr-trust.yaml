@@ -2,3 +2,7 @@
 # Disable Ramen s3StoreProfiles CA injection; vp-manage trust bundles supply workload TLS trust.
 odfRamenTrustedCa:
   enabled: false
+
+# vp-manage-proxy-cluster-ca merges PEM without legacy "# CA from …" comment markers.
+odfDrPrerequisites:
+  caMaterialMode: trust-bundle
