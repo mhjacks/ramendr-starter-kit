@@ -1,0 +1,4 @@
+---
+# Disable Ramen s3StoreProfiles CA injection; vp-manage trust bundles supply workload TLS trust.
+odfRamenTrustedCa:
+  enabled: false

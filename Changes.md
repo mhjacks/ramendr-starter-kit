@@ -39,3 +39,17 @@ v1.2 - June 2026
 * Default to OCP 4.22
 * Update to ACM chart v0.2.*
 * Use versioned charts for opp-policy, regionaldr, and application data protection
+
+v1.3 (exploration) - test_new_cluster_truster branch
+
+* Wire **vp-manage-proxy-cluster-ca-chart** (trust-manager + ESO PushSecret) on hub and
+  spokes; chart is pulled from git (`mhjacks/vp-manage-proxy-cluster-ca-chart`,
+  branch `refactor/trust-manager-bundle`) for validation, not the helm repo.
+* Add **cert-manager Operator** subscription with `TrustManager=true` on hub and resilient clusters.
+* Override `configMapName: cluster-proxy-ca-bundle` so prerequisites checks keep working.
+* **byNamespaceNameBundle** injects merged trust into `openshift-config`, `openshift-gitops`, and
+  `openshift-adp` (label-based opt-in disabled).
+* **opp-policy** from git (`mhjacks/opp-policy-chart`, branch `disable-odf-ssl-extraction`):
+  `odfSslCertificateExtractor.enabled: false`.
+* **regionaldr** from git (`mhjacks/regionaldr-with-virt-chart`, branch `disable-odf-ramen-trusted-ca`):
+  `odfRamenTrustedCa.enabled: false` (no Ramen s3StoreProfiles CA injection).

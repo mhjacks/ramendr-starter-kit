@@ -4,6 +4,7 @@ clusterGroup:
   isHubCluster: true
   namespaces:
     cluster-ca-mgt: {}
+    cert-manager-operator: {}
     open-cluster-management: {}
     open-cluster-management-observability: {}
     vault: {}
@@ -33,6 +34,15 @@ clusterGroup:
     openshift-data-foundation:
       name: odf-operator
       namespace: openshift-storage
+
+    cert-manager:
+      name: openshift-cert-manager-operator
+      namespace: cert-manager-operator
+      channel: stable-v1
+      config:
+        env:
+          - name: UNSUPPORTED_ADDON_FEATURES
+            value: TrustManager=true
 
   argoCD:
     resourceTrackingMethod: annotation
@@ -80,12 +90,27 @@ clusterGroup:
       extraValueFiles:
         - '$patternref/overrides/values-console-plugins-hub.yaml'
 
+    # Cluster-wide Proxy trusted CA via trust-manager + ESO/Vault (replaces opp SSL extraction).
+    # Chart sourced from git (validation branch) — not the helm repo.
+    vp-manage-proxy-cluster-ca:
+      name: vp-manage-proxy-cluster-ca
+      namespace: openshift-config
+      argoProject: opp
+      repoURL: https://github.com/mhjacks/vp-manage-proxy-cluster-ca-chart
+      path: .
+      chartVersion: refactor/trust-manager-bundle
+      annotations:
+        argocd.argoproj.io/sync-wave: "4"
+      extraValueFiles:
+        - '$patternref/overrides/values-vp-manage-proxy-cluster-ca.yaml'
+
     opp-policy:
       name: opp-policy
       namespace: openshift
       argoProject: opp
-      chart: opp-policy-chart
-      chartVersion: 0.0.*
+      repoURL: https://github.com/mhjacks/opp-policy-chart
+      path: .
+      chartVersion: disable-odf-ssl-extraction
       annotations:
         argocd.argoproj.io/sync-wave: "5"
       syncPolicy:
@@ -104,6 +129,7 @@ clusterGroup:
           - ServerSideApply=true
       extraValueFiles:
         - '/overrides/values-cluster-names.yaml'
+        - '$patternref/overrides/values-opp-policy.yaml'
       ignoreDifferences:
       - group: operators.openshift.io
         kind: Console
@@ -114,8 +140,9 @@ clusterGroup:
       name: regional-dr
       namespace: regional-dr
       argoProject: opp
-      chart: regionaldr-with-virt
-      chartVersion: 0.0.*
+      repoURL: https://github.com/mhjacks/regionaldr-with-virt-chart
+      path: .
+      chartVersion: disable-odf-ramen-trusted-ca
       annotations:
         argocd.argoproj.io/sync-wave: "10"
       syncPolicy:
@@ -132,6 +159,7 @@ clusterGroup:
       extraValueFiles:
         - '/overrides/values-cluster-names.yaml'
         - '/overrides/values-egv-dr.yaml'
+        - '$patternref/overrides/values-regionaldr-trust.yaml'
       ignoreDifferences:
         # Prevent ArgoCD from pruning dynamically created OCM resources
         # These resources are created by OCM operators and should never be pruned

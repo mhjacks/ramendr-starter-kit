@@ -7,6 +7,7 @@ clusterGroup:
     resourceTrackingMethod: annotation
 
   namespaces:
+    cert-manager-operator: {}
     openshift-cnv: {}
     openshift-storage: {}
     policies: {}
@@ -53,6 +54,15 @@ clusterGroup:
       name: odf-operator
       namespace: openshift-storage
 
+    cert-manager:
+      name: openshift-cert-manager-operator
+      namespace: cert-manager-operator
+      channel: stable-v1
+      config:
+        env:
+          - name: UNSUPPORTED_ADDON_FEATURES
+            value: TrustManager=true
+
     openshift-oadp:
       name: redhat-oadp-operator
       namespace: openshift-adp
@@ -73,6 +83,18 @@ clusterGroup:
       chartVersion: 0.1.*
       extraValueFiles:
         - '$patternref/overrides/values-console-plugins-spokes.yaml'
+
+    vp-manage-proxy-cluster-ca:
+      name: vp-manage-proxy-cluster-ca
+      namespace: openshift-config
+      argoProject: resilient
+      repoURL: https://github.com/mhjacks/vp-manage-proxy-cluster-ca-chart
+      path: .
+      chartVersion: refactor/trust-manager-bundle
+      annotations:
+        argocd.argoproj.io/sync-wave: "4"
+      extraValueFiles:
+        - '$patternref/overrides/values-vp-manage-proxy-cluster-ca.yaml'
 
     openshift-external-secrets:
       name: openshift-external-secrets

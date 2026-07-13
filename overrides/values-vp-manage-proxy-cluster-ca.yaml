@@ -1,0 +1,41 @@
+---
+# vp-manage-proxy-cluster-ca-chart: trust-manager Bundle + ESO PushSecret/Vault export.
+# Replaces opp-policy SSL extraction and regionaldr Ramen s3StoreProfiles CA injection.
+# configMapName matches historical rdr/opp expectations for Proxy trustedCA and prerequisites.
+
+configMapName: cluster-proxy-ca-bundle
+targetNamespace: openshift-config
+
+hubCluster: ""
+
+trustManager:
+  enabled: true
+  trustNamespace: cert-manager
+  bundle:
+    useDefaultCAs: true
+  byNamespaceNameBundle:
+    enabled: true
+    namespaces:
+      - openshift-config
+      - openshift-gitops
+      - openshift-adp
+  byLabelBundle:
+    enabled: false
+
+includeApiCA: true
+includeIngressCA: true
+
+eso:
+  secretStore:
+    name: vault-backend
+    kind: ClusterSecretStore
+  export:
+    enabled: true
+  externalSecret:
+    enabled: true
+
+cronJob:
+  enabled: true
+
+syncJob:
+  enabled: true
