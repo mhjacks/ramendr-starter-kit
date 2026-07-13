@@ -3,6 +3,7 @@ clusterGroup:
   name: hub
   isHubCluster: true
   namespaces:
+    vp-manage-proxy-cluster-ca: {}
     cluster-ca-mgt: {}
     cert-manager-operator: {}
     open-cluster-management: {}

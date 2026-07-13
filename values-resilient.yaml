@@ -7,6 +7,7 @@ clusterGroup:
     resourceTrackingMethod: annotation
 
   namespaces:
+    vp-manage-proxy-cluster-ca: {}
     cert-manager-operator: {}
     openshift-cnv: {}
     openshift-storage: {}
