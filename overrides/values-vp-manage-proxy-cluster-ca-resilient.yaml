@@ -1,0 +1,5 @@
+---
+trustTest:
+  enabled: true
+  namespaces:
+    - openshift-adp

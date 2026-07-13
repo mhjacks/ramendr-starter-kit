@@ -97,6 +97,7 @@ clusterGroup:
         argocd.argoproj.io/sync-wave: "4"
       extraValueFiles:
         - '$patternref/overrides/values-vp-manage-proxy-cluster-ca.yaml'
+        - '$patternref/overrides/values-vp-manage-proxy-cluster-ca-resilient.yaml'
 
     openshift-external-secrets:
       name: openshift-external-secrets
