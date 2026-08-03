@@ -98,17 +98,11 @@ clusterGroup:
       extraValueFiles:
         - '$patternref/overrides/values-vp-manage-proxy-cluster-ca-resilient.yaml'
       ignoreDifferences:
+        # Newer than ESO 1.0; omit from chart manifests. Ignore only when live ESO defaults it.
         - group: external-secrets.io
           kind: ExternalSecret
           jqPathExpressions:
-            - .spec.dataFrom[].extract.conversionStrategy
-            - .spec.dataFrom[].extract.decodingStrategy
-            - .spec.dataFrom[].extract.metadataPolicy
             - .spec.dataFrom[].extract.nullBytePolicy
-        - group: external-secrets.io
-          kind: PushSecret
-          jqPathExpressions:
-            - .spec.data[].conversionStrategy
 
     ensure-openshift-console-plugins:
       name: ensure-openshift-console-plugins
