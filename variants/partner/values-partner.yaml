@@ -17,6 +17,7 @@ clusterGroup:
     cert-manager-operator: {}
     cert-manager: {}
     vp-manage-proxy-cluster-ca: {}
+    s4: {}
   subscriptions:
     acm:
       name: advanced-cluster-management
@@ -107,6 +108,19 @@ clusterGroup:
         kind: Console
         jsonPointers:
           - /spec/plugins
+
+    vp-s4-storage:
+      name: vp-s4-storage
+      namespace: vp-s4-storage
+      argoProject: hub
+      chart: vp-s4-storage
+      chartVersion: 0.2.*
+      overrides:
+        # Vault paths from examples/secrets/values-secret.v2.yaml (adjust prefix as needed)
+        - name: s4UICredentials.vaultKey
+          value: secret/data/global/s4-ui-credentials
+        - name: s4APICredentials.vaultKey
+          value: secret/data/global/s4-api-credentials
 
     vp-manage-proxy-cluster-ca:
       name: vp-manage-proxy-cluster-ca
