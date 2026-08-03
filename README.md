@@ -33,7 +33,7 @@ variants/
   partner/
     values-partner.yaml
     values-resilient.yaml              # partner spoke BOM (no ODF)
-    values-regional-dr.yaml            # chart-owned DRClusters; no DRPolicy/DRPC/VMs
+    values-regional-dr.yaml            # infrastructure DRPolicy/DRClusters; no DRPC/VMs
     values-console-plugins-*.yaml
 overrides/                             # shared hub/spoke chart overrides
 ```
