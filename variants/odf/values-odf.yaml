@@ -1,6 +1,6 @@
 ---
 clusterGroup:
-  name: hub
+  name: odf
   isHubCluster: true
   namespaces:
     cluster-ca-mgt: {}
@@ -96,8 +96,12 @@ clusterGroup:
       name: opp-policy
       namespace: openshift
       argoProject: opp
-      chart: opp-policy-chart
-      chartVersion: 0.0.*
+      # Control test: fork until opp-policy-chart 0.0.5 is published
+      #chart: opp-policy-chart
+      #chartVersion: 0.0.5
+      repoURL: https://github.com/mhjacks/opp-policy-chart.git
+      chartVersion: vp-manage-proxy-cluster-ca
+      path: "."
       annotations:
         argocd.argoproj.io/sync-wave: "5"
       syncPolicy:
@@ -126,8 +130,12 @@ clusterGroup:
       name: vp-manage-proxy-cluster-ca
       namespace: vp-manage-proxy-cluster-ca
       argoProject: hub
-      chart: vp-manage-proxy-cluster-ca
-      chartVersion: 0.2.*
+      # Control test: fork until vp-manage-proxy-cluster-ca 0.2.1 is published
+      #chart: vp-manage-proxy-cluster-ca
+      #chartVersion: 0.2.1
+      repoURL: https://github.com/mhjacks/vp-manage-proxy-cluster-ca-chart.git
+      chartVersion: eso-externalsecret-argocd-sync
+      path: "."
       annotations:
         argocd.argoproj.io/sync-wave: "3"
       syncPolicy:
@@ -145,6 +153,11 @@ clusterGroup:
       extraValueFiles:
         - '$patternref/overrides/values-vp-manage-proxy-cluster-ca-hub.yaml'
       ignoreDifferences:
+        # Newer than ESO 1.0; omit from chart manifests. Ignore only when live ESO defaults it.
+        - group: external-secrets.io
+          kind: ExternalSecret
+          jqPathExpressions:
+            - .spec.dataFrom[].extract.nullBytePolicy
         - group: trust.cert-manager.io
           kind: Bundle
           jqPathExpressions:
@@ -165,8 +178,12 @@ clusterGroup:
       name: odf-dr
       namespace: regional-dr
       argoProject: opp
-      chart: odf-dr-chart
-      chartVersion: 0.0.*
+      # Control test: fork until odf-dr-chart 0.0.4 is published
+      #chart: odf-dr-chart
+      #chartVersion: 0.0.4
+      repoURL: https://github.com/mhjacks/odf-dr-chart.git
+      chartVersion: vp-manage-proxy-cluster-ca
+      path: "."
       annotations:
         argocd.argoproj.io/sync-wave: "8"
       syncPolicy:
@@ -189,8 +206,12 @@ clusterGroup:
       name: regional-dr
       namespace: regional-dr
       argoProject: opp
-      chart: regionaldr-with-virt
-      chartVersion: 0.0.*
+      # Control test: fork until regionaldr-with-virt 0.1.0 is published
+      #chart: regionaldr-with-virt
+      #chartVersion: 0.1.0
+      repoURL: https://github.com/mhjacks/regionaldr-with-virt-chart.git
+      chartVersion: conditionalize_resources
+      path: "."
       annotations:
         argocd.argoproj.io/sync-wave: "10"
       syncPolicy:

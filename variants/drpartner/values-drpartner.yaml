@@ -1,6 +1,6 @@
 ---
 clusterGroup:
-  name: partner
+  name: drpartner
   isHubCluster: true
   namespaces:
     cluster-ca-mgt: {}
@@ -77,14 +77,15 @@ clusterGroup:
       chart: ensure-openshift-console-plugins
       chartVersion: 0.1.*
       extraValueFiles:
-        - '$patternref/variants/partner/values-console-plugins-hub.yaml'
+        - '$patternref/variants/drpartner/values-console-plugins-hub.yaml'
 
     opp-policy:
       name: opp-policy
       namespace: openshift
       argoProject: opp
+      # Control test: fork until opp-policy-chart 0.0.5 is published
       #chart: opp-policy-chart
-      #chartVersion: 0.0.*
+      #chartVersion: 0.0.5
       repoURL: https://github.com/mhjacks/opp-policy-chart.git
       chartVersion: vp-manage-proxy-cluster-ca
       path: "."
@@ -129,8 +130,9 @@ clusterGroup:
       name: vp-manage-proxy-cluster-ca
       namespace: vp-manage-proxy-cluster-ca
       argoProject: hub
+      # Control test: fork until vp-manage-proxy-cluster-ca 0.2.1 is published
       #chart: vp-manage-proxy-cluster-ca
-      #chartVersion: 0.2.*
+      #chartVersion: 0.2.1
       repoURL: https://github.com/mhjacks/vp-manage-proxy-cluster-ca-chart.git
       chartVersion: eso-externalsecret-argocd-sync
       path: "."
@@ -177,8 +179,9 @@ clusterGroup:
       name: regional-dr
       namespace: regional-dr
       argoProject: opp
+      # Control test: fork until regionaldr-with-virt 0.1.0 is published
       #chart: regionaldr-with-virt
-      #chartVersion: 0.0.*
+      #chartVersion: 0.1.0
       repoURL: https://github.com/mhjacks/regionaldr-with-virt-chart.git
       chartVersion: conditionalize_resources
       path: "."
@@ -196,7 +199,7 @@ clusterGroup:
           - RespectIgnoreDifferences=true
       extraValueFiles:
         - '/overrides/values-cluster-names.yaml'
-        - '$patternref/variants/partner/values-regional-dr.yaml'
+        - '$patternref/variants/drpartner/values-regional-dr.yaml'
       ignoreDifferences:
         - group: internal.open-cluster-management.io
           kind: ManagedClusterInfo

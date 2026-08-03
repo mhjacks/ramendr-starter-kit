@@ -1,5 +1,17 @@
 # Change history for significant pattern releases
 
+v1.3 - August 2026
+
+* Rename install variants: `hub` → `odf`, `partner` → `drpartner`.
+* Control-test chart pointers (fork branches until published):
+  * opp-policy-chart 0.0.5 (`vp-manage-proxy-cluster-ca`)
+  * odf-dr-chart 0.0.4 (`vp-manage-proxy-cluster-ca`)
+  * regionaldr-with-virt 0.1.0 (`conditionalize_resources`)
+  * vp-manage-proxy-cluster-ca 0.2.1 (`eso-externalsecret-argocd-sync`)
+* Default `main.variant: odf` for regression control vs previous full ODF install.
+* `drpartner` uses opp-policy for Submariner/s3-ssl/CA (no odf-dr app); regionaldr
+  with `ramen.infrastructureEnabled` for DRPolicy/DRClusters without DRPC/VMs.
+
 v1.3 - July 2026
 
 * Adopt clustergroup/ACM `variants/` folder layout (`global.vpNewFolderDir`):

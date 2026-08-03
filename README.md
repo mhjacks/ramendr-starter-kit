@@ -19,19 +19,19 @@ Spoke BOMs nest under the install variant as
 
 | Variant | Select | Purpose |
 |---------|--------|---------|
-| `hub` (default) | `main.variant: hub` | Baseline: full ODF Regional DR + Virtualization |
-| `partner` | `main.variant: partner` | Partner CSI foundation: Submariner, OADP, OCP-V, Ramen/MCO; no ODF storage or Ramen CRs |
+| `odf` (default) | `main.variant: odf` | Baseline: full ODF Regional DR + Virtualization |
+| `drpartner` | `main.variant: drpartner` | Partner CSI foundation: Submariner, OADP, OCP-V, Ramen/MCO; no ODF storage; infrastructure DRPolicy/DRClusters without DRPC/VMs |
 
 Layout:
 
 ```text
 values-global.yaml
 variants/
-  hub/
-    values-hub.yaml
+  odf/
+    values-odf.yaml
     values-resilient.yaml              # full ODF spoke BOM
-  partner/
-    values-partner.yaml
+  drpartner/
+    values-drpartner.yaml
     values-resilient.yaml              # partner spoke BOM (no ODF)
     values-regional-dr.yaml            # infrastructure DRPolicy/DRClusters; no DRPC/VMs
     values-console-plugins-*.yaml
@@ -42,8 +42,17 @@ Example — set the variant in [`values-global.yaml`](values-global.yaml):
 
 ```yaml
 main:
-  variant: partner
+  variant: drpartner
 ```
 
-Partner expectations after sync: Submariner and s3-ssl/CA via **opp-policy**, MCO (Ramen), CNV, and OADP present;
-no odf-dr, MirrorPeer, DRPolicy/DRPC, or ODF StorageSystem.
+Control-test chart pins (until published on charts.validatedpatterns.io):
+
+| Chart | Target version | Fork branch |
+|-------|----------------|-------------|
+| opp-policy-chart | 0.0.5 | `vp-manage-proxy-cluster-ca` |
+| odf-dr-chart | 0.0.4 | `vp-manage-proxy-cluster-ca` |
+| regionaldr-with-virt | 0.1.0 | `conditionalize_resources` |
+| vp-manage-proxy-cluster-ca | 0.2.1 | `eso-externalsecret-argocd-sync` |
+
+`drpartner` expectations after sync: Submariner and s3-ssl/CA via **opp-policy**, MCO (Ramen), CNV, and OADP present;
+no odf-dr, MirrorPeer, or ODF StorageSystem; regionaldr with `ramen.infrastructureEnabled` (no DRPC/VMs).

@@ -1,5 +1,6 @@
 ---
 # Partner CSI foundation: DRPolicy + DRClusters + validation without DRPC/VMs.
+# Requires regionaldr-with-virt >= 0.1.0 (ramen.infrastructureEnabled).
 ramen:
   resourcesEnabled: false
   infrastructureEnabled: true
@@ -7,7 +8,7 @@ ramen:
 edgeGitopsVms:
   enabled: false
 
-# Optional: override default s3profile-<cluster> names.
+# Optional: override default s3profile- plus cluster name.
 # drCluster:
 #   primaryS3ProfileName: s3profile-ocp-primary
 #   secondaryS3ProfileName: s3profile-ocp-secondary

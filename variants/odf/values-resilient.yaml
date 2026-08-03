@@ -83,8 +83,12 @@ clusterGroup:
       name: vp-manage-proxy-cluster-ca
       namespace: vp-manage-proxy-cluster-ca
       argoProject: resilient
-      chart: vp-manage-proxy-cluster-ca
-      chartVersion: 0.2.*
+      # Control test: fork until vp-manage-proxy-cluster-ca 0.2.1 is published
+      #chart: vp-manage-proxy-cluster-ca
+      #chartVersion: 0.2.1
+      repoURL: https://github.com/mhjacks/vp-manage-proxy-cluster-ca-chart.git
+      chartVersion: eso-externalsecret-argocd-sync
+      path: "."
       syncPolicy:
         automated: {}
         retry:
@@ -99,6 +103,12 @@ clusterGroup:
           - CreateNamespace=true
       extraValueFiles:
         - '$patternref/overrides/values-vp-manage-proxy-cluster-ca-resilient.yaml'
+      ignoreDifferences:
+        # Newer than ESO 1.0; omit from chart manifests. Ignore only when live ESO defaults it.
+        - group: external-secrets.io
+          kind: ExternalSecret
+          jqPathExpressions:
+            - .spec.dataFrom[].extract.nullBytePolicy
 
     ensure-openshift-console-plugins:
       name: ensure-openshift-console-plugins
