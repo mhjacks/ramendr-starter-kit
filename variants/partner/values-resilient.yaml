@@ -105,6 +105,10 @@ clusterGroup:
             - .spec.dataFrom[].extract.decodingStrategy
             - .spec.dataFrom[].extract.metadataPolicy
             - .spec.dataFrom[].extract.nullBytePolicy
+        - group: external-secrets.io
+          kind: PushSecret
+          jqPathExpressions:
+            - .spec.data[].conversionStrategy
 
     ensure-openshift-console-plugins:
       name: ensure-openshift-console-plugins
