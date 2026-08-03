@@ -17,7 +17,7 @@ clusterGroup:
     cert-manager-operator: {}
     cert-manager: {}
     vp-manage-proxy-cluster-ca: {}
-    s4: {}
+    vp-s4-storage: {}
   subscriptions:
     acm:
       name: advanced-cluster-management
