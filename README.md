@@ -34,7 +34,6 @@ variants/
     values-partner.yaml
     values-resilient.yaml              # partner spoke BOM (no ODF)
     values-regional-dr.yaml            # ramen.resourcesEnabled / edgeGitopsVms off
-    values-odf-dr.yaml                 # no MirrorPeer; keep Submariner + CA trust
     values-console-plugins-*.yaml
 overrides/                             # shared hub/spoke chart overrides
 ```
@@ -46,5 +45,5 @@ main:
   variant: partner
 ```
 
-Partner expectations after sync: Submariner, MCO (Ramen), CNV, and OADP present;
-no MirrorPeer, DRPolicy/DRPC, or ODF StorageSystem.
+Partner expectations after sync: Submariner and s3-ssl/CA via **opp-policy**, MCO (Ramen), CNV, and OADP present;
+no odf-dr, MirrorPeer, DRPolicy/DRPC, or ODF StorageSystem.

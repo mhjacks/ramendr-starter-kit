@@ -1,4 +1,0 @@
----
-# Partner CSI foundation: ODF MirrorPeer / post-install off; CA from vp-proxy.
-odf:
-  postInstallFixesEnabled: false

@@ -5,12 +5,12 @@ v1.3 - July 2026
 * Adopt clustergroup/ACM `variants/` folder layout (`global.vpNewFolderDir`):
   * `variants/hub/` — baseline hub + `values-resilient.yaml` (full ODF spoke)
   * `variants/partner/` — partner hub + partner `values-resilient.yaml` (no ODF)
-    and chart deltas (`values-regional-dr.yaml`, `values-odf-dr.yaml`) that disable
-    DRPC/VM workloads and MirrorPeer while keeping Submariner and CA trust
+    and chart deltas (`values-regional-dr.yaml`) that disable DRPC/VM workloads;
+    Submariner and s3-ssl/CA live in opp-policy (no odf-dr app)
 * Declare install-time variants in `pattern-metadata.yaml` (`hub` default, `partner`).
 * Prefer `main.variant` in `values-global.yaml` (requires clustergroup chart >= 0.9.57).
 * Partner: Submariner, OADP, OCP-V, and ODF Multicluster Orchestrator (Ramen) without
-  ODF StorageSystem, MirrorPeer, or Ramen DR CRs. Select with `main.variant: partner`.
+  ODF StorageSystem, MirrorPeer, odf-dr, or Ramen DR CRs. Select with `main.variant: partner`.
 * Partner leaves a commented subscription hook for an alternate (non-ODF) Ramen productization.
 * Requires `regionaldr-with-virt` chart >= 0.0.4 (`ramen.resourcesEnabled` / `edgeGitopsVms.enabled`).
 
