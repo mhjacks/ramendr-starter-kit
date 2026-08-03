@@ -83,8 +83,11 @@ clusterGroup:
       name: opp-policy
       namespace: openshift
       argoProject: opp
-      chart: opp-policy-chart
-      chartVersion: 0.0.*
+      #chart: opp-policy-chart
+      #chartVersion: 0.0.*
+      repoURL: https://github.com/mhjacks/opp-policy-chart.git
+      chartVersion: vp-manage-proxy-cluster-ca
+      path: "."
       annotations:
         argocd.argoproj.io/sync-wave: "5"
       syncPolicy:
@@ -161,13 +164,16 @@ clusterGroup:
           jqPathExpressions:
             - .status
 
-    # Submariner + cluster CA trust (no MirrorPeer / ODF post-install).
+    # MirrorPeer / ODF post-install (Submariner + s3-ssl live in opp-policy).
     odf-dr:
       name: odf-dr
       namespace: regional-dr
       argoProject: opp
-      chart: odf-dr-chart
-      chartVersion: 0.0.*
+      #chart: odf-dr-chart
+      #chartVersion: 0.0.*
+      repoURL: https://github.com/mhjacks/odf-dr-chart.git
+      chartVersion: vp-manage-proxy-cluster-ca
+      path: "."
       annotations:
         argocd.argoproj.io/sync-wave: "8"
       syncPolicy:
@@ -192,8 +198,11 @@ clusterGroup:
       name: regional-dr
       namespace: regional-dr
       argoProject: opp
-      chart: regionaldr-with-virt
-      chartVersion: 0.0.*
+      #chart: regionaldr-with-virt
+      #chartVersion: 0.0.*
+      repoURL: https://github.com/mhjacks/regionaldr-with-virt-chart.git
+      chartVersion: conditionalize_resources
+      path: "."
       annotations:
         argocd.argoproj.io/sync-wave: "10"
       syncPolicy:
