@@ -129,8 +129,11 @@ clusterGroup:
       name: vp-manage-proxy-cluster-ca
       namespace: vp-manage-proxy-cluster-ca
       argoProject: hub
-      chart: vp-manage-proxy-cluster-ca
-      chartVersion: 0.2.*
+      #chart: vp-manage-proxy-cluster-ca
+      #chartVersion: 0.2.*
+      repoURL: https://github.com/mhjacks/vp-manage-proxy-cluster-ca-chart.git
+      chartVersion: eso-externalsecret-argocd-sync
+      path: "."
       annotations:
         argocd.argoproj.io/sync-wave: "3"
       syncPolicy:
@@ -148,6 +151,13 @@ clusterGroup:
       extraValueFiles:
         - '$patternref/overrides/values-vp-manage-proxy-cluster-ca-hub.yaml'
       ignoreDifferences:
+        - group: external-secrets.io
+          kind: ExternalSecret
+          jqPathExpressions:
+            - .spec.dataFrom[].extract.conversionStrategy
+            - .spec.dataFrom[].extract.decodingStrategy
+            - .spec.dataFrom[].extract.metadataPolicy
+            - .spec.dataFrom[].extract.nullBytePolicy
         - group: trust.cert-manager.io
           kind: Bundle
           jqPathExpressions:
