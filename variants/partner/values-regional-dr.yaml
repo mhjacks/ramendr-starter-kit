@@ -1,7 +1,14 @@
 ---
-# Partner CSI foundation: cluster bring-up without Ramen CRs or VM DR workloads.
+# Partner CSI foundation: cluster bring-up without DRPolicy/DRPC/VM workloads.
+# Chart-owned DRClusters (no MirrorPeer); S3 profile names default to s3profile-<cluster>.
 ramen:
   resourcesEnabled: false
 
 edgeGitopsVms:
   enabled: false
+
+drCluster:
+  create: true
+  # Override if hub Ramen profiles use different names:
+  # primaryS3ProfileName: s3profile-ocp-primary
+  # secondaryS3ProfileName: s3profile-ocp-secondary
