@@ -11,7 +11,10 @@ global:
     provider: aws
 
 main:
-  clusterGroupName: hub
+  # Selecting a variant loads variants/<name>/values-<name>.yaml when the
+  # variants/ folder is present (global.vpNewFolderDir=true).
+  variant: hub
   multiSourceConfig:
     enabled: true
+    # Need >= 0.9.57 for variants/ folder path helpers (vpNewFolderDir).
     clusterGroupChartVersion: 0.9.*

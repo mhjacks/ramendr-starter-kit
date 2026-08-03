@@ -1,5 +1,19 @@
 # Change history for significant pattern releases
 
+v1.3 - July 2026
+
+* Adopt clustergroup/ACM `variants/` folder layout (`global.vpNewFolderDir`):
+  * `variants/hub/` — baseline hub + `values-resilient.yaml` (full ODF spoke)
+  * `variants/partner/` — partner hub + partner `values-resilient.yaml` (no ODF)
+    and chart deltas (`values-regional-dr.yaml`, `values-odf-dr.yaml`) that disable
+    DRPC/VM workloads and MirrorPeer while keeping Submariner and CA trust
+* Declare install-time variants in `pattern-metadata.yaml` (`hub` default, `partner`).
+* Prefer `main.variant` in `values-global.yaml` (requires clustergroup chart >= 0.9.57).
+* Partner: Submariner, OADP, OCP-V, and ODF Multicluster Orchestrator (Ramen) without
+  ODF StorageSystem, MirrorPeer, or Ramen DR CRs. Select with `main.variant: partner`.
+* Partner leaves a commented subscription hook for an alternate (non-ODF) Ramen productization.
+* Requires `regionaldr-with-virt` chart >= 0.0.4 (`ramen.resourcesEnabled` / `edgeGitopsVms.enabled`).
+
 v1.0 - November 2025
 
 * Arrange to default baseDomain settings appropriately so that forking the pattern is not a hard requirement

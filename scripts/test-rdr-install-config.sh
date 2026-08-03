@@ -18,7 +18,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 CHART="$REPO_ROOT/charts/hub/rdr"
 RDR_VALUES="$REPO_ROOT/charts/hub/rdr/values.yaml"
 OVERRIDES="$REPO_ROOT/overrides/values-cluster-names.yaml"
-VALUES_HUB="$REPO_ROOT/values-hub.yaml"
+VALUES_HUB="$REPO_ROOT/variants/hub/values-hub.yaml"
 DOMAIN="${TEST_CLUSTER_DOMAIN:-example.com}"
 
 # Minimal regionalDR (simulates old values-hub that replaced full regionalDR)

@@ -1,0 +1,11 @@
+---
+# Partner CSI foundation: Submariner + cluster CA trust.
+# Disables ODF MirrorPeer / post-install; Submariner stays always-on in odf-dr-chart.
+odf:
+  postInstallFixesEnabled: false
+
+odfSslCertificateExtractor:
+  enabled: true
+
+odfRamenTrustedCa:
+  enabled: false

@@ -1,0 +1,7 @@
+---
+# Partner CSI foundation: cluster bring-up without Ramen CRs or VM DR workloads.
+ramen:
+  resourcesEnabled: false
+
+edgeGitopsVms:
+  enabled: false
