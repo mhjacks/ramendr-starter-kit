@@ -1,6 +1,7 @@
 # Partner CSI minimal: Hive/BYOC + operators only — no S4, DRPolicy, DRClusters,
 # or DRCluster validation. No DRPC/VMs either.
 # Requires regionaldr-with-virt >= 0.1.0 (ramen.resourcesEnabled / infrastructureEnabled).
+# Chart still runs PostSync argocd-sync-disable (wave 13) after settlement.
 ramen:
   resourcesEnabled: false
   infrastructureEnabled: false
