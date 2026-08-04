@@ -6,10 +6,10 @@ v1.3 - August 2026
 * Split partner install: `drpartner` → `drpartner-s4`; add `drpartner-minimal`
   (no vp-s4-storage; `ramen.infrastructureEnabled: false`; `submariner.enabled: false`
   in opp-policy).
-* S3 / DRCluster ownership: hub buckets + s3StoreProfiles upsert stay in regionaldr
-  (enabled for `drpartner-s4` via `infrastructureEnabled`; off for `drpartner-minimal`;
-  `odf` relies on MirrorPeer). opp-policy injects `caCertificates` only — does not
-  create profiles or buckets.
+* S3 / DRCluster ownership: for `drpartner-s4`, **vp-s4-storage** creates buckets
+  (`s4Role.buckets`); regionaldr upserts hub s3StoreProfiles with `ensureBuckets: false`
+  and creates DRClusters (`infrastructureEnabled`). Off for `drpartner-minimal`.
+  `odf` relies on MirrorPeer. opp-policy injects `caCertificates` only.
 * Control-test chart pointers (fork branches until published):
   * opp-policy-chart 0.0.5 (`vp-manage-proxy-cluster-ca`)
   * odf-dr-chart 0.0.4 (`vp-manage-proxy-cluster-ca`)
@@ -18,7 +18,7 @@ v1.3 - August 2026
 * Default `main.variant: odf` for regression control vs previous full ODF install.
 * `drpartner-s4` uses opp-policy for Submariner/s3-ssl/CA (no odf-dr app); regionaldr
   with `ramen.infrastructureEnabled` for DRPolicy/DRClusters and hub s3StoreProfiles
-  upsert (from `vp-s4-storage`) without DRPC/VMs.
+  upsert (`ensureBuckets: false`); **vp-s4-storage** owns bucket create without DRPC/VMs.
 
 v1.3 - July 2026
 
