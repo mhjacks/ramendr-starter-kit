@@ -1,6 +1,6 @@
 ---
 clusterGroup:
-  name: drpartner
+  name: drpartner-minimal
   isHubCluster: true
   namespaces:
     cluster-ca-mgt: {}
@@ -17,7 +17,6 @@ clusterGroup:
     cert-manager-operator: {}
     cert-manager: {}
     vp-manage-proxy-cluster-ca: {}
-    vp-s4-storage: {}
   subscriptions:
     acm:
       name: advanced-cluster-management
@@ -77,7 +76,7 @@ clusterGroup:
       chart: ensure-openshift-console-plugins
       chartVersion: 0.1.*
       extraValueFiles:
-        - '$patternref/variants/drpartner/values-console-plugins-hub.yaml'
+        - '$patternref/variants/drpartner-minimal/values-console-plugins-hub.yaml'
 
     opp-policy:
       name: opp-policy
@@ -107,24 +106,12 @@ clusterGroup:
           - ServerSideApply=true
       extraValueFiles:
         - '/overrides/values-cluster-names.yaml'
+        - '$patternref/variants/drpartner-minimal/values-opp-policy.yaml'
       ignoreDifferences:
       - group: operators.openshift.io
         kind: Console
         jsonPointers:
           - /spec/plugins
-
-    vp-s4-storage:
-      name: vp-s4-storage
-      namespace: vp-s4-storage
-      argoProject: hub
-      chart: vp-s4-storage
-      chartVersion: 0.2.*
-      overrides:
-        # Vault paths from examples/secrets/values-secret.v2.yaml (adjust prefix as needed)
-        - name: s4UICredentials.vaultKey
-          value: secret/data/global/s4-ui-credentials
-        - name: s4APICredentials.vaultKey
-          value: secret/data/global/s4-api-credentials
 
     vp-manage-proxy-cluster-ca:
       name: vp-manage-proxy-cluster-ca
@@ -174,7 +161,7 @@ clusterGroup:
           jqPathExpressions:
             - .status
 
-    # Hive/BYOC cluster bring-up without Ramen CRs or VM DR workloads.
+    # Hive/BYOC cluster bring-up without Ramen CRs, DRClusters, validation, or VMs.
     rdr:
       name: regional-dr
       namespace: regional-dr
@@ -199,7 +186,7 @@ clusterGroup:
           - RespectIgnoreDifferences=true
       extraValueFiles:
         - '/overrides/values-cluster-names.yaml'
-        - '$patternref/variants/drpartner/values-regional-dr.yaml'
+        - '$patternref/variants/drpartner-minimal/values-regional-dr.yaml'
       ignoreDifferences:
         - group: internal.open-cluster-management.io
           kind: ManagedClusterInfo

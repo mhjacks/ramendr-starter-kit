@@ -3,14 +3,22 @@
 v1.3 - August 2026
 
 * Rename install variants: `hub` → `odf`, `partner` → `drpartner`.
+* Split partner install: `drpartner` → `drpartner-s4`; add `drpartner-minimal`
+  (no vp-s4-storage; `ramen.infrastructureEnabled: false`; `submariner.enabled: false`
+  in opp-policy).
+* S3 / DRCluster ownership: hub buckets + s3StoreProfiles upsert stay in regionaldr
+  (enabled for `drpartner-s4` via `infrastructureEnabled`; off for `drpartner-minimal`;
+  `odf` relies on MirrorPeer). opp-policy injects `caCertificates` only — does not
+  create profiles or buckets.
 * Control-test chart pointers (fork branches until published):
   * opp-policy-chart 0.0.5 (`vp-manage-proxy-cluster-ca`)
   * odf-dr-chart 0.0.4 (`vp-manage-proxy-cluster-ca`)
   * regionaldr-with-virt 0.1.0 (`conditionalize_resources`)
   * vp-manage-proxy-cluster-ca 0.2.1 (`eso-externalsecret-argocd-sync`)
 * Default `main.variant: odf` for regression control vs previous full ODF install.
-* `drpartner` uses opp-policy for Submariner/s3-ssl/CA (no odf-dr app); regionaldr
-  with `ramen.infrastructureEnabled` for DRPolicy/DRClusters without DRPC/VMs.
+* `drpartner-s4` uses opp-policy for Submariner/s3-ssl/CA (no odf-dr app); regionaldr
+  with `ramen.infrastructureEnabled` for DRPolicy/DRClusters and hub s3StoreProfiles
+  upsert (from `vp-s4-storage`) without DRPC/VMs.
 
 v1.3 - July 2026
 

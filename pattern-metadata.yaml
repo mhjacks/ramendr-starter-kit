@@ -3,7 +3,7 @@
 # documentation and qe
 metadata_version: "1.0"
 name: ramendr-starter-kit
-description: RamenDR Regional DR with Virtualization starter kit (odf and drpartner variants)
+description: RamenDR Regional DR with Virtualization starter kit (odf, drpartner-s4, and drpartner-minimal variants)
 pattern_version: "1.2"
 display_name: RamenDR Starter Kit
 repo_url: https://github.com/validatedpatterns/ramendr-starter-kit
@@ -53,7 +53,11 @@ variants:
   - name: odf
     default: true
     description: Baseline full ODF Regional DR with Virtualization
-  - name: drpartner
+  - name: drpartner-s4
     description: >-
-      Partner CSI foundation — Submariner, OADP, OCP-V, Ramen/MCO without
-      ODF storage or full Ramen DRPC/VM workloads
+      Partner CSI foundation with hub S4 object storage — Submariner, OADP,
+      OCP-V, Ramen/MCO; infrastructure DRPolicy/DRClusters without DRPC/VMs
+  - name: drpartner-minimal
+    description: >-
+      Partner CSI foundation without S4, Submariner, or DRCluster sync/validation —
+      OADP, OCP-V, Ramen/MCO only (Hive/BYOC bring-up)

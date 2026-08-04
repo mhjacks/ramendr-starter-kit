@@ -20,7 +20,8 @@ Spoke BOMs nest under the install variant as
 | Variant | Select | Purpose |
 |---------|--------|---------|
 | `odf` (default) | `main.variant: odf` | Baseline: full ODF Regional DR + Virtualization |
-| `drpartner` | `main.variant: drpartner` | Partner CSI foundation: Submariner, OADP, OCP-V, Ramen/MCO; no ODF storage; infrastructure DRPolicy/DRClusters without DRPC/VMs |
+| `drpartner-s4` | `main.variant: drpartner-s4` | Partner CSI + hub S4: Submariner, OADP, OCP-V, Ramen/MCO; infrastructure DRPolicy/DRClusters without DRPC/VMs |
+| `drpartner-minimal` | `main.variant: drpartner-minimal` | Partner CSI without S4, Submariner, or DRCluster sync/validation: OADP, OCP-V, Ramen/MCO; Hive/BYOC only |
 
 Layout:
 
@@ -30,19 +31,33 @@ variants/
   odf/
     values-odf.yaml
     values-resilient.yaml              # full ODF spoke BOM
-  drpartner/
-    values-drpartner.yaml
+  drpartner-s4/
+    values-drpartner-s4.yaml
     values-resilient.yaml              # partner spoke BOM (no ODF)
-    values-regional-dr.yaml            # infrastructure DRPolicy/DRClusters; no DRPC/VMs
+    values-regional-dr.yaml            # infrastructureEnabled: DRClusters + hub s3StoreProfiles/buckets
+    values-console-plugins-*.yaml
+  drpartner-minimal/
+    values-drpartner-minimal.yaml      # no vp-s4-storage
+    values-resilient.yaml
+    values-regional-dr.yaml            # resourcesEnabled + infrastructureEnabled false
+    values-opp-policy.yaml             # submariner.enabled: false
     values-console-plugins-*.yaml
 overrides/                             # shared hub/spoke chart overrides
 ```
+
+### S3 profiles and DRClusters by variant
+
+| Variant | Hub DRClusters | Hub s3StoreProfiles / buckets | CA on profiles |
+|---------|----------------|-------------------------------|----------------|
+| `odf` | MirrorPeer / MCO | MirrorPeer / MCO (regionaldr does not upsert) | opp-policy `s3CaInjector` |
+| `drpartner-s4` | regionaldr (`ramen.infrastructureEnabled`) | regionaldr upsert from **vp-s4-storage** | opp-policy `s3CaInjector` |
+| `drpartner-minimal` | none | none (no S3) | n/a |
 
 Example — set the variant in [`values-global.yaml`](values-global.yaml):
 
 ```yaml
 main:
-  variant: drpartner
+  variant: drpartner-s4
 ```
 
 Control-test chart pins (until published on charts.validatedpatterns.io):
@@ -54,5 +69,9 @@ Control-test chart pins (until published on charts.validatedpatterns.io):
 | regionaldr-with-virt | 0.1.0 | `conditionalize_resources` |
 | vp-manage-proxy-cluster-ca | 0.2.1 | `eso-externalsecret-argocd-sync` |
 
-`drpartner` expectations after sync: Submariner and s3-ssl/CA via **opp-policy**, MCO (Ramen), CNV, and OADP present;
-no odf-dr, MirrorPeer, or ODF StorageSystem; regionaldr with `ramen.infrastructureEnabled` (no DRPC/VMs).
+`drpartner-s4` expectations after sync: Submariner and s3-ssl/CA via **opp-policy**, hub **vp-s4-storage**, MCO (Ramen), CNV, and OADP present;
+no odf-dr, MirrorPeer, or ODF StorageSystem; regionaldr with `ramen.infrastructureEnabled` creates DRClusters and upserts hub
+s3StoreProfiles/buckets (no DRPC/VMs); opp-policy injects `caCertificates` only.
+
+`drpartner-minimal` expectations after sync: same partner operators/plumbing without **vp-s4-storage** or Submariner (`submariner.enabled: false` in opp-policy); regionaldr with both
+`ramen.resourcesEnabled` and `ramen.infrastructureEnabled` false (no DRPolicy, DRClusters, validation, or S3 profile/bucket work).

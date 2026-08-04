@@ -1,0 +1,11 @@
+# Partner CSI + S4: DRPolicy + hub DRClusters + validation without DRPC/VMs.
+# Requires regionaldr-with-virt >= 0.1.0 (ramen.infrastructureEnabled + s3StoreProfiles upsert).
+# Hub BOM deploys vp-s4-storage; regionaldr upserts hub s3StoreProfiles/buckets from those
+# defaults and sets DRCluster.spec.s3ProfileName. opp-policy injects caCertificates only.
+# (odf uses MirrorPeer for profiles; drpartner-minimal leaves infrastructureEnabled false.)
+ramen:
+  resourcesEnabled: false
+  infrastructureEnabled: true
+
+edgeGitopsVms:
+  enabled: false
