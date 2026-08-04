@@ -75,3 +75,16 @@ s3StoreProfiles only (`ensureBuckets: false`; no DRPC/VMs); opp-policy injects `
 
 `drpartner-minimal` expectations after sync: same partner operators/plumbing without **vp-s4-storage** or Submariner (`submariner.enabled: false` in opp-policy); regionaldr with both
 `ramen.resourcesEnabled` and `ramen.infrastructureEnabled` false (no DRPolicy, DRClusters, validation, or S3 profile/bucket work).
+
+### Secrets for `drpartner-s4` (`values-secret`)
+
+Copy [`values-secret.yaml.template`](values-secret.yaml.template) to `values-secret.yaml` (gitignored) and load secrets before/with install. In addition to the shared pattern secrets (`aws`, `openshiftPullSecret`, `vm-ssh`, `cloud-init`), **`drpartner-s4` requires two Vault secrets** for hub **vp-s4-storage**. Paths must match the chart overrides in `variants/drpartner-s4/values-drpartner-s4.yaml` (`s4UICredentials.vaultKey` / `s4APICredentials.vaultKey`).
+
+| Vault secret | Keys | Purpose |
+|--------------|------|---------|
+| `global/s4-ui-credentials` | `UI_USERNAME`, `UI_PASSWORD` | S4 Web UI login |
+| `global/s4-api-credentials` | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | S3 API identity for S4, bucket Jobs, and Ramen profiles |
+
+Defaults in the template use `s4admin` for the UI user and access key id; password and secret key can be generated (`onMissingValue: generate` + `advancedPolicy`). External Secrets merges both Vault entries into Kubernetes Secret `s4-credentials` in `vp-s4-storage`.
+
+`drpartner-minimal` does not deploy **vp-s4-storage** and does not need these two secrets.

@@ -120,7 +120,7 @@ clusterGroup:
       chart: vp-s4-storage
       chartVersion: 0.2.*
       overrides:
-        # Vault paths from examples/secrets/values-secret.v2.yaml (adjust prefix as needed)
+        # Vault paths from values-secret.yaml.template (s4-*-credentials; adjust prefix as needed)
         - name: s4UICredentials.vaultKey
           value: secret/data/global/s4-ui-credentials
         - name: s4APICredentials.vaultKey
