@@ -20,7 +20,7 @@ Spoke BOMs nest under the install variant as
 | Variant | Select | Purpose |
 |---------|--------|---------|
 | `odf` (default) | `main.variant: odf` | Baseline: full ODF Regional DR + Virtualization |
-| `drpartner-s4` | `main.variant: drpartner-s4` | Partner CSI + hub S4: Submariner, OADP, OCP-V, Ramen/MCO; infrastructure DRPolicy/DRClusters without DRPC/VMs |
+| `drpartner-s4` | `main.variant: drpartner-s4` | Partner CSI + hub S4: Submariner, OADP, OCP-V, Ramen/MCO; infrastructure DRClusters + `2m-novm` DRPolicy (no `2m-vm`/DRPC/VMs) |
 | `drpartner-minimal` | `main.variant: drpartner-minimal` | Partner CSI without S4, Submariner, or DRCluster sync/validation: OADP, OCP-V, Ramen/MCO; Hive/BYOC only |
 
 Layout:
@@ -34,7 +34,7 @@ variants/
   drpartner-s4/
     values-drpartner-s4.yaml
     values-resilient.yaml              # partner spoke BOM (no ODF)
-    values-regional-dr.yaml            # infrastructureEnabled: DRClusters + hub s3StoreProfiles
+    values-regional-dr.yaml            # infrastructureEnabled: DRClusters + 2m-novm only + hub s3StoreProfiles
     values-console-plugins-*.yaml
   drpartner-minimal/
     values-drpartner-minimal.yaml      # no vp-s4-storage
@@ -70,7 +70,7 @@ Control-test chart pins (until published on charts.validatedpatterns.io):
 | vp-manage-proxy-cluster-ca | 0.2.1 | `eso-externalsecret-argocd-sync` |
 
 `drpartner-s4` expectations after sync: Submariner and s3-ssl/CA via **opp-policy**, hub **vp-s4-storage** (buckets via `s4Role.buckets`), MCO (Ramen), CNV, and OADP present;
-no odf-dr, MirrorPeer, or ODF StorageSystem; regionaldr with `ramen.infrastructureEnabled` creates DRClusters and upserts hub
+no odf-dr, MirrorPeer, or ODF StorageSystem; regionaldr with `ramen.infrastructureEnabled` creates DRClusters, a single `2m-novm` DRPolicy (no `2m-vm`), and upserts hub
 s3StoreProfiles only (`ensureBuckets: false`; no DRPC/VMs); opp-policy injects `caCertificates` only.
 
 `drpartner-minimal` expectations after sync: same partner operators/plumbing without **vp-s4-storage** or Submariner (`submariner.enabled: false` in opp-policy); regionaldr with both

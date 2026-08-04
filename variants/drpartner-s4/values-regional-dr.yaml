@@ -4,6 +4,8 @@
 # only (ensureBuckets: false) and sets DRCluster.spec.s3ProfileName. opp-policy injects
 # caCertificates only. (odf uses MirrorPeer for profiles; drpartner-minimal leaves
 # infrastructureEnabled false.)
+#
+# regionalDR list replace (Helm): keep cluster names; only 2m-novm DRPolicy (no 2m-vm).
 ramen:
   resourcesEnabled: false
   infrastructureEnabled: true
@@ -14,3 +16,13 @@ drCluster:
 
 edgeGitopsVms:
   enabled: false
+
+regionalDR:
+  - name: resilient
+    clusters:
+      primary:
+        name: ocp-primary
+      secondary:
+        name: ocp-secondary
+    drpolicies:
+      - interval: 2m

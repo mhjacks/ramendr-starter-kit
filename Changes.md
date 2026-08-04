@@ -17,8 +17,9 @@ v1.3 - August 2026
   * vp-manage-proxy-cluster-ca 0.2.1 (`eso-externalsecret-argocd-sync`)
 * Default `main.variant: odf` for regression control vs previous full ODF install.
 * `drpartner-s4` uses opp-policy for Submariner/s3-ssl/CA (no odf-dr app); regionaldr
-  with `ramen.infrastructureEnabled` for DRPolicy/DRClusters and hub s3StoreProfiles
-  upsert (`ensureBuckets: false`); **vp-s4-storage** owns bucket create without DRPC/VMs.
+  with `ramen.infrastructureEnabled` for DRClusters, `2m-novm` only (no `2m-vm`), and hub
+  s3StoreProfiles upsert (`ensureBuckets: false`); **vp-s4-storage** owns bucket create
+  without DRPC/VMs.
 
 v1.3 - July 2026
 
