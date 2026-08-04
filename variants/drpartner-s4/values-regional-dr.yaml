@@ -26,3 +26,4 @@ regionalDR:
         name: ocp-secondary
     drpolicies:
       - interval: 2m
+        name: 2m-drpolicy
