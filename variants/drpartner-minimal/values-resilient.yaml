@@ -78,12 +78,8 @@ clusterGroup:
       name: vp-manage-proxy-cluster-ca
       namespace: vp-manage-proxy-cluster-ca
       argoProject: resilient
-      # Control test: fork until vp-manage-proxy-cluster-ca 0.2.1 is published
-      #chart: vp-manage-proxy-cluster-ca
-      #chartVersion: 0.2.1
-      repoURL: https://github.com/mhjacks/vp-manage-proxy-cluster-ca-chart.git
-      chartVersion: eso-externalsecret-argocd-sync
-      path: "."
+      chart: vp-manage-proxy-cluster-ca
+      chartVersion: 0.2.*
       syncPolicy:
         automated: {}
         retry:

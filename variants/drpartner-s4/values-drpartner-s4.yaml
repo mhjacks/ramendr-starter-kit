@@ -83,12 +83,8 @@ clusterGroup:
       name: opp-policy
       namespace: openshift
       argoProject: opp
-      # Control test: fork until opp-policy-chart 0.0.5 is published
-      #chart: opp-policy-chart
-      #chartVersion: 0.0.5
-      repoURL: https://github.com/mhjacks/opp-policy-chart.git
-      chartVersion: vp-manage-proxy-cluster-ca
-      path: "."
+      chart: opp-policy-chart
+      chartVersion: 0.1.*
       annotations:
         argocd.argoproj.io/sync-wave: "5"
       syncPolicy:
@@ -135,12 +131,8 @@ clusterGroup:
       name: vp-manage-proxy-cluster-ca
       namespace: vp-manage-proxy-cluster-ca
       argoProject: hub
-      # Control test: fork until vp-manage-proxy-cluster-ca 0.2.1 is published
-      #chart: vp-manage-proxy-cluster-ca
-      #chartVersion: 0.2.1
-      repoURL: https://github.com/mhjacks/vp-manage-proxy-cluster-ca-chart.git
-      chartVersion: eso-externalsecret-argocd-sync
-      path: "."
+      chart: vp-manage-proxy-cluster-ca
+      chartVersion: 0.2.1
       annotations:
         argocd.argoproj.io/sync-wave: "3"
       syncPolicy:
