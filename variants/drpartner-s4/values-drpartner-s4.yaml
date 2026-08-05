@@ -176,12 +176,8 @@ clusterGroup:
       name: regional-dr
       namespace: regional-dr
       argoProject: opp
-      # Control test: fork until regionaldr-with-virt 0.1.0 is published
-      #chart: regionaldr-with-virt
-      #chartVersion: 0.1.0
-      repoURL: https://github.com/mhjacks/regionaldr-with-virt-chart.git
-      chartVersion: conditionalize_resources
-      path: "."
+      chart: regionaldr-with-virt
+      chartVersion: 0.1.*
       annotations:
         argocd.argoproj.io/sync-wave: "10"
       syncPolicy:
