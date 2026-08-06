@@ -83,11 +83,8 @@ clusterGroup:
       name: opp-policy
       namespace: openshift
       argoProject: opp
-      #chart: opp-policy-chart
-      #chartVersion: 0.1.*
-      repoURL: https://github.com/mhjacks/opp-policy-chart.git
-      chartVersion: fix-spoke-ramen-managed-namespace
-      path: "."
+      chart: opp-policy-chart
+      chartVersion: 0.1.*
       annotations:
         argocd.argoproj.io/sync-wave: "5"
       syncPolicy:
