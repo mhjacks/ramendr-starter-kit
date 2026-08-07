@@ -170,8 +170,11 @@ clusterGroup:
       name: odf-dr
       namespace: regional-dr
       argoProject: opp
-      chart: odf-dr-chart
-      chartVersion: 0.1.*
+      #chart: odf-dr-chart
+      #chartVersion: 0.1.*
+      repoURL: https://github.com/mhjacks/regionaldr-with-virt-chart.git
+      chartVersion: paramterize_namespace
+      path: "."
       annotations:
         argocd.argoproj.io/sync-wave: "8"
       syncPolicy:
