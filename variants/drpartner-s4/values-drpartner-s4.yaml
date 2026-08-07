@@ -176,8 +176,11 @@ clusterGroup:
       name: regional-dr
       namespace: regional-dr
       argoProject: opp
-      chart: regionaldr-with-virt
-      chartVersion: 0.1.*
+      #chart: regionaldr-with-virt
+      #chartVersion: 0.1.*
+      repoURL: https://github.com/mhjacks/regionaldr-with-virt-chart.git
+      chartVersion: parameterize_namespace
+      path: "."
       annotations:
         argocd.argoproj.io/sync-wave: "10"
       # automated starts on so install can settle; PostSync argocd-sync-disable
