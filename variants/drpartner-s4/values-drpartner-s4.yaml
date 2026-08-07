@@ -179,7 +179,7 @@ clusterGroup:
       #chart: regionaldr-with-virt
       #chartVersion: 0.1.*
       repoURL: https://github.com/mhjacks/regionaldr-with-virt-chart.git
-      chartVersion: parameterize_namespace
+      chartVersion: paramterize_namespace
       path: "."
       annotations:
         argocd.argoproj.io/sync-wave: "10"
