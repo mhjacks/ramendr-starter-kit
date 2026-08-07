@@ -3,10 +3,10 @@
 v1.3 - August 2026
 
 * regional-dr PostSync autosync disable: require `regionaldr-with-virt` >= 0.1.1 so
-  `argocd-sync-disable` targets `global.namespace` (not spoke `main.clusterGroupName`)
-  and installs hub Application `ignoreDifferences` on
-  `Application/regional-dr` `/spec/syncPolicy/automated` (parent selfHeal cannot
-  re-enable autosync from git).
+  `argocd-sync-disable` targets `pattern`-`clusterGroup.name` (Application CR NS;
+  not destination `$ARGOCD_APP_NAMESPACE` / `regional-dr`) and installs hub
+  Application `ignoreDifferences` on `Application/regional-dr`
+  `/spec/syncPolicy/automated` (parent selfHeal cannot re-enable autosync from git).
 * Rename install variants: `hub` → `odf`, `partner` → `drpartner`.
 * Split partner install: `drpartner` → `drpartner-s4`; add `drpartner-minimal`
   (no vp-s4-storage; `ramen.infrastructureEnabled: false`; `submariner.enabled: false`

@@ -5,9 +5,10 @@
 # caCertificates only. (odf uses MirrorPeer for profiles; drpartner-minimal leaves
 # infrastructureEnabled false.)
 #
-# PostSync argocd-sync-disable (wave 13) targets the Argo Application namespace
-# (global.namespace) and adds hub ignoreDifferences for syncPolicy.automated so
-# parent selfHeal cannot re-enable autosync after settlement.
+# PostSync argocd-sync-disable (wave 13) looks up the Application CR in
+# pattern-clusterGroup.name (not destination $ARGOCD_APP_NAMESPACE) and adds hub
+# ignoreDifferences for syncPolicy.automated so parent selfHeal cannot re-enable
+# autosync after settlement.
 #
 # regionalDR list replace (Helm): keep cluster names; only 2m-novm DRPolicy (no 2m-vm).
 ramen:
