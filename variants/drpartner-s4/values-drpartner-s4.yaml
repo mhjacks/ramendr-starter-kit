@@ -180,6 +180,9 @@ clusterGroup:
       chartVersion: 0.1.*
       annotations:
         argocd.argoproj.io/sync-wave: "10"
+      # automated starts on so install can settle; PostSync argocd-sync-disable
+      # (regionaldr-with-virt >= 0.1.1) removes it and adds hub ignoreDifferences
+      # so this desired automated: {} is not re-applied by parent selfHeal.
       syncPolicy:
         automated: {}
         retry:

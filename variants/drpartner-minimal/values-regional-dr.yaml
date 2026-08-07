@@ -2,6 +2,9 @@
 # or DRCluster validation. No DRPC/VMs either.
 # Requires regionaldr-with-virt >= 0.1.0 (ramen.resourcesEnabled / infrastructureEnabled).
 # Chart still runs PostSync argocd-sync-disable (wave 13) after settlement.
+# That Job uses global.namespace (Argo $ARGOCD_APP_NAMESPACE) and adds hub
+# ignoreDifferences for Application/regional-dr syncPolicy.automated so parent
+# selfHeal cannot re-enable autosync.
 ramen:
   resourcesEnabled: false
   infrastructureEnabled: false
