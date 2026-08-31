@@ -17,10 +17,10 @@ clusterOverrides:
             type: m5.xlarge
       compute:
         - name: worker
-          replicas: 3
+          replicas: 5
           platform:
             aws:
-              type: m5.2xlarge
+              type: m5.4xlarge
       platform:
         aws:
           region: us-west-1
@@ -41,10 +41,10 @@ clusterOverrides:
             type: m5.xlarge
       compute:
         - name: worker
-          replicas: 3
+          replicas: 5
           platform:
             aws:
-              type: m5.2xlarge
+              type: m5.4xlarge
       platform:
         aws:
           region: us-east-1
