@@ -1,6 +1,6 @@
 ---
 clusterGroup:
-  name: odf_exp
+  name: odf-exp
   isHubCluster: true
   namespaces:
     cluster-ca-mgt: {}
@@ -99,8 +99,8 @@ clusterGroup:
           - ServerSideApply=true
       extraValueFiles:
         - '$patternref/overrides/values-cluster-names.yaml'
-        - '$patternref/variants/odf_exp/values-cluster-names.yaml'
-        - '$patternref/variants/odf_exp/values-opp-policy.yaml'
+        - '$patternref/variants/odf-exp/values-cluster-names.yaml'
+        - '$patternref/variants/odf-exp/values-opp-policy.yaml'
       ignoreDifferences:
       - group: operators.openshift.io
         kind: Console
@@ -172,8 +172,8 @@ clusterGroup:
           - RespectIgnoreDifferences=true
       extraValueFiles:
         - '/overrides/values-cluster-names.yaml'
-        - '$patternref/variants/odf_exp/values-cluster-names.yaml'
-        - '$patternref/variants/odf_exp/values-regional-dr.yaml'
+        - '$patternref/variants/odf-exp/values-cluster-names.yaml'
+        - '$patternref/variants/odf-exp/values-regional-dr.yaml'
       ignoreDifferences:
         - group: internal.open-cluster-management.io
           kind: ManagedClusterInfo

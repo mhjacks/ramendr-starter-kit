@@ -14,8 +14,10 @@ global:
 main:
   # Selecting a variant loads variants/<name>/values-<name>.yaml when the
   # variants/ folder is present (global.vpNewFolderDir=true).
-  # odf_experiment = ODF + Submariner operators/add-ons, Hive clusters, no Ramen/DR CRs.
-  variant: odf_exp
+  # odf-exp = ODF + Submariner operators/add-ons, Hive clusters, no Ramen/DR CRs.
+  # Variant names must be RFC 1123 (lowercase alphanumeric and hyphens only);
+  # the hub GitOps Application is named {pattern}-{variant}.
+  variant: odf-exp
   multiSourceConfig:
     enabled: true
     # Need >= 0.9.57 for variants/ folder path helpers (vpNewFolderDir).

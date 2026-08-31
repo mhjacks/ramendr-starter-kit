@@ -2,7 +2,7 @@
 
 v1.3 - August 2026
 
-* Add `odf_experiment` variant: ODF StorageCluster + Submariner without Ramen,
+* Add `odf-exp` variant: ODF StorageCluster + Submariner without Ramen,
   MirrorPeer, or VM configuration; managed clusters `odf-exp-1`/`odf-exp-2`
   on OCP 4.22 with AWS userTag `auto-stop: ignore`.
 * BYOC validation (`ansible/playbooks/validate_byoc.yml`): remove worker metal /
