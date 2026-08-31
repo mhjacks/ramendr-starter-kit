@@ -33,6 +33,11 @@ clusterGroup:
       name: kubevirt-hyperconverged
       namespace: openshift-cnv
       channel: stable
+      # Nested virt on non-metal workers (m5.2xlarge): HCO software emulation.
+      config:
+        env:
+          - name: KVM_EMULATION
+            value: "true"
 
     external-dns:
       name: external-dns-operator
@@ -128,6 +133,8 @@ clusterGroup:
       argoProject: resilient
       chart: openshift-virtualization-instance
       chartVersion: 0.1.*
+      extraValueFiles:
+        - '$patternref/variants/odf-exp/values-ocp-v.yaml'
 
     odf:
       name: odf

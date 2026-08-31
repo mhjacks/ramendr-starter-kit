@@ -29,7 +29,7 @@ Spoke BOMs nest under the install variant as
 | Variant | Select | Purpose |
 |---------|--------|---------|
 | `odf` (default) | `main.variant: odf` | Baseline: full ODF Regional DR + Virtualization |
-| `odf-exp` | `main.variant: odf-exp` | ODF StorageCluster + Submariner without Ramen/MirrorPeer/VM configuration; managed clusters `odf-exp-1`/`odf-exp-2` on OCP 4.22 (`m5.xlarge` masters, `m5.2xlarge` workers) with AWS `auto-stop: ignore` |
+| `odf-exp` | `main.variant: odf-exp` | ODF StorageCluster + Submariner without Ramen/MirrorPeer/VM configuration; managed clusters `odf-exp-1`/`odf-exp-2` on OCP 4.22 (`m5.xlarge` masters, `m5.2xlarge` workers) with nested virt (CNV `useEmulation`) and AWS `auto-stop: ignore` |
 | `drpartner-s4` | `main.variant: drpartner-s4` | Partner CSI + hub S4: OADP, OCP-V, Ramen/MCO; infrastructure DRClusters + `2m-novm` DRPolicy (no `2m-vm`/DRPC/VMs); Submariner disabled |
 | `drpartner-minimal` | `main.variant: drpartner-minimal` | Partner CSI without S4, Submariner, or DRCluster sync/validation: OADP, OCP-V, Ramen/MCO; Hive/BYOC only |
 
@@ -47,6 +47,7 @@ variants/
     values-regional-dr.yaml            # resourcesEnabled + infrastructureEnabled false
     values-cluster-names.yaml          # odf-exp-1/odf-exp-2, 4.22.1, auto-stop tag
     values-opp-policy.yaml             # submariner.enabled: true; s3CaInjector off
+    values-ocp-v.yaml                  # CNV nested virt: cnv.debug.useEmulation
   drpartner-s4/
     values-drpartner-s4.yaml
     values-resilient.yaml              # partner spoke BOM (no ODF)
