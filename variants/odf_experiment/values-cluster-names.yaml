@@ -9,6 +9,18 @@ clusterOverrides:
     install_config:
       metadata:
         name: odf-exp-1
+      controlPlane:
+        name: master
+        replicas: 3
+        platform:
+          aws:
+            type: m5.xlarge
+      compute:
+        - name: worker
+          replicas: 3
+          platform:
+            aws:
+              type: m5.2xlarge
       platform:
         aws:
           region: us-west-1
@@ -21,6 +33,18 @@ clusterOverrides:
     install_config:
       metadata:
         name: odf-exp-2
+      controlPlane:
+        name: master
+        replicas: 3
+        platform:
+          aws:
+            type: m5.xlarge
+      compute:
+        - name: worker
+          replicas: 3
+          platform:
+            aws:
+              type: m5.2xlarge
       platform:
         aws:
           region: us-east-1
