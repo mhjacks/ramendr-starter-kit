@@ -1,0 +1,18 @@
+---
+# opp-policy has no clusterOverrides helper; set ACM ManagedCluster names here.
+regionalDR:
+  - name: resilient
+    clusters:
+      primary:
+        name: odf-exp-1
+      secondary:
+        name: odf-exp-2
+
+# Install Submariner (Broker, ManagedClusterAddOn, SubmarinerConfig). Do not add
+# extra cableDriver/instanceType overrides; chart defaults apply.
+submariner:
+  enabled: true
+
+# No Ramen s3StoreProfiles in this variant (no MirrorPeer / ramen CRs).
+s3CaInjector:
+  enabled: false

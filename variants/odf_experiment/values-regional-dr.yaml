@@ -1,0 +1,9 @@
+---
+# Hive/BYOC cluster bring-up only: install ODF + Submariner operators/add-ons
+# elsewhere; do not create Ramen CRs, DRClusters, or VM workloads.
+ramen:
+  resourcesEnabled: false
+  infrastructureEnabled: false
+
+edgeGitopsVms:
+  enabled: false

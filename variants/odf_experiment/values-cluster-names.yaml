@@ -1,0 +1,32 @@
+---
+# Variant overlay for Hive/ACM cluster names, OCP version, and AWS userTags.
+# Applied after overrides/values-cluster-names.yaml so chart regionalDR defaults
+# stay intact (clusterOverrides, not a replacement regionalDR list).
+clusterOverrides:
+  primary:
+    name: odf-exp-1
+    version: 4.22.1
+    install_config:
+      metadata:
+        name: odf-exp-1
+      platform:
+        aws:
+          region: us-west-1
+          userTags:
+            project: ValidatedPatterns
+            auto-stop: ignore
+  secondary:
+    name: odf-exp-2
+    version: 4.22.1
+    install_config:
+      metadata:
+        name: odf-exp-2
+      platform:
+        aws:
+          region: us-east-1
+          userTags:
+            project: ValidatedPatterns
+            auto-stop: ignore
+
+drpc:
+  preferredCluster: odf-exp-1

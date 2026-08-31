@@ -14,8 +14,8 @@ global:
 main:
   # Selecting a variant loads variants/<name>/values-<name>.yaml when the
   # variants/ folder is present (global.vpNewFolderDir=true).
-  # Default odf = control test of restructured charts vs previous full ODF install.
-  variant: rhdr-s4
+  # odf_experiment = ODF + Submariner operators/add-ons, Hive clusters, no Ramen/DR CRs.
+  variant: odf_experiment
   multiSourceConfig:
     enabled: true
     # Need >= 0.9.57 for variants/ folder path helpers (vpNewFolderDir).

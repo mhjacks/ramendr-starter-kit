@@ -29,6 +29,7 @@ Spoke BOMs nest under the install variant as
 | Variant | Select | Purpose |
 |---------|--------|---------|
 | `odf` (default) | `main.variant: odf` | Baseline: full ODF Regional DR + Virtualization |
+| `odf_experiment` | `main.variant: odf_experiment` | ODF StorageCluster + Submariner without Ramen/MirrorPeer/VM configuration; managed clusters `odf-exp-1`/`odf-exp-2` on OCP 4.22 with AWS `auto-stop: ignore` |
 | `drpartner-s4` | `main.variant: drpartner-s4` | Partner CSI + hub S4: OADP, OCP-V, Ramen/MCO; infrastructure DRClusters + `2m-novm` DRPolicy (no `2m-vm`/DRPC/VMs); Submariner disabled |
 | `drpartner-minimal` | `main.variant: drpartner-minimal` | Partner CSI without S4, Submariner, or DRCluster sync/validation: OADP, OCP-V, Ramen/MCO; Hive/BYOC only |
 
@@ -40,6 +41,12 @@ variants/
   odf/
     values-odf.yaml
     values-resilient.yaml              # full ODF spoke BOM
+  odf_experiment/
+    values-odf_experiment.yaml         # ODF operator + StorageCluster; no odf-dr/MirrorPeer
+    values-resilient.yaml              # ODF spoke BOM (operator + StorageCluster)
+    values-regional-dr.yaml            # resourcesEnabled + infrastructureEnabled false
+    values-cluster-names.yaml          # odf-exp-1/odf-exp-2, 4.22.1, auto-stop tag
+    values-opp-policy.yaml             # submariner.enabled: true; s3CaInjector off
   drpartner-s4/
     values-drpartner-s4.yaml
     values-resilient.yaml              # partner spoke BOM (no ODF)
@@ -59,6 +66,7 @@ overrides/                             # shared hub/spoke chart overrides
 | Variant | Hub DRClusters | Hub s3StoreProfiles | Buckets | CA on profiles |
 |---------|----------------|---------------------|---------|----------------|
 | `odf` | MirrorPeer / MCO | MirrorPeer / MCO | ODF | opp-policy `s3CaInjector` |
+| `odf_experiment` | none | none | none | n/a (`s3CaInjector` off) |
 | `drpartner-s4` | regionaldr (`ramen.infrastructureEnabled`) | regionaldr upsert (`ensureBuckets: false`) | **vp-s4-storage** `s4Role.buckets` | opp-policy `s3CaInjector` |
 | `drpartner-minimal` | none | none | none | n/a |
 
@@ -81,6 +89,9 @@ Control-test chart pins (until published on charts.validatedpatterns.io):
 `drpartner-s4` expectations after sync: s3-ssl/CA via **opp-policy** (Submariner disabled in `values-opp-policy.yaml`), hub **vp-s4-storage** (buckets via `s4Role.buckets`), MCO (Ramen), CNV, and OADP present;
 no odf-dr, MirrorPeer, or ODF StorageSystem; regionaldr with `ramen.infrastructureEnabled` creates DRClusters, a single `2m-novm` DRPolicy (no `2m-vm`), and upserts hub
 s3StoreProfiles only (`ensureBuckets: false`; no DRPC/VMs); opp-policy injects `caCertificates` only.
+
+`odf_experiment` expectations after sync: ODF operator + StorageCluster chart and Submariner add-on (opp-policy `submariner.enabled: true`); no odf-dr/MirrorPeer; regionaldr with both
+`ramen.resourcesEnabled` and `ramen.infrastructureEnabled` false (no DRPolicy, DRClusters, validation, or VM workloads). Managed clusters are `odf-exp-1` and `odf-exp-2` on OCP 4.22.1 with AWS userTag `auto-stop: ignore`.
 
 `drpartner-minimal` expectations after sync: same partner operators/plumbing without **vp-s4-storage** or Submariner (`submariner.enabled: false` in opp-policy); regionaldr with both
 `ramen.resourcesEnabled` and `ramen.infrastructureEnabled` false (no DRPolicy, DRClusters, validation, or S3 profile/bucket work).
