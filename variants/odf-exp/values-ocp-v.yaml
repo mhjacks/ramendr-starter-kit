@@ -1,6 +1,0 @@
----
-# Nested/non-metal workers (m5.2xlarge): QEMU software emulation so
-# OpenShift Virtualization can start VMs without /dev/kvm.
-cnv:
-  debug:
-    useEmulation: true

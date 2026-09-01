@@ -133,8 +133,6 @@ clusterGroup:
       argoProject: resilient
       chart: openshift-virtualization-instance
       chartVersion: 0.1.*
-      extraValueFiles:
-        - '$patternref/variants/odf-exp/values-ocp-v.yaml'
 
     odf:
       name: odf
