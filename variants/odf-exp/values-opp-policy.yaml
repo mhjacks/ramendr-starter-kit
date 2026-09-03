@@ -4,9 +4,9 @@ regionalDR:
   - name: resilient
     clusters:
       primary:
-        name: odf-exp-1
+        name: dr-poc-1
       secondary:
-        name: odf-exp-2
+        name: dr-poc-2
 
 # Install Submariner (Broker, ManagedClusterAddOn, SubmarinerConfig). Do not add
 # extra cableDriver/instanceType overrides; chart defaults apply.
@@ -15,4 +15,4 @@ submariner:
 
 # No Ramen s3StoreProfiles in this variant (no MirrorPeer / ramen CRs).
 s3CaInjector:
-  enabled: false
+  enabled: true
