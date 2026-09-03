@@ -4,11 +4,11 @@
 # stay intact (clusterOverrides, not a replacement regionalDR list).
 clusterOverrides:
   primary:
-    name: odf-exp-1
+    name: dr-poc-1
     version: 4.22.1
     install_config:
       metadata:
-        name: odf-exp-1
+        name: dr-poc-1
       controlPlane:
         name: master
         replicas: 3
@@ -28,11 +28,11 @@ clusterOverrides:
             project: ValidatedPatterns
             auto-stop: ignore
   secondary:
-    name: odf-exp-2
+    name: dr-poc-2
     version: 4.22.1
     install_config:
       metadata:
-        name: odf-exp-2
+        name: dr-poc-2
       controlPlane:
         name: master
         replicas: 3
@@ -53,4 +53,4 @@ clusterOverrides:
             auto-stop: ignore
 
 drpc:
-  preferredCluster: odf-exp-1
+  preferredCluster: dr-poc-1
