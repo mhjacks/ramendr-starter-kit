@@ -14,6 +14,9 @@ clusterOverrides:
       platform:
         aws:
           region: us-west-1
+          userTags:
+            project: ValidatedPatterns
+            auto-stop: ignore
   secondary:
     name: ocp-secondary
     version: 4.22.1
@@ -23,6 +26,9 @@ clusterOverrides:
       platform:
         aws:
           region: us-east-1
+          userTags:
+            project: ValidatedPatterns
+            auto-stop: ignore
 
 # DRPC preferredCluster must be the ACM ManagedCluster name (ocp-primary), not the
 # install_config.metadata.name (mhj-ocp-422-p). Ramen uses this to target ManifestWork.
