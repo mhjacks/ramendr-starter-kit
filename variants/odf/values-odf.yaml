@@ -78,6 +78,7 @@ clusterGroup:
       namespace: open-cluster-management-observability
       # chart: openshift-observability
       repoURL: https://github.com/mhjacks/openshift-observability-chart.git
+      path: "."
       chartVersion: main
       extraValueFiles:
         - '$patternref/overrides/values-rdr-o11y.yaml'
