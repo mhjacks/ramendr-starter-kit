@@ -73,6 +73,15 @@ clusterGroup:
   #   - '/overrides/values-{{ $.Values.global.hubClusterDomain }}.yaml'
   #   - '/overrides/values-{{ $.Values.global.localClusterDomain }}.yaml'
   applications:
+    observability:
+      name: observability
+      namespace: open-cluster-management-observability
+      # chart: openshift-observability
+      repoURL: https://github.com/mhjacks/openshift-observability-chart.git
+      chartVersion: main
+      extraValueFiles:
+        - '$patternref/overrides/values-rdr-o11y.yaml'
+
     acm:
       name: acm
       namespace: open-cluster-management
