@@ -108,7 +108,7 @@ clusterGroup:
       chart: ensure-openshift-console-plugins
       chartVersion: 0.1.*
       extraValueFiles:
-        - '$patternref/variants/ds-drpartner-s4/values-console-plugins-spokes.yaml'
+        - '$patternref/variants/ds-drp-s4/values-console-plugins-spokes.yaml'
 
     openshift-external-secrets:
       name: openshift-external-secrets

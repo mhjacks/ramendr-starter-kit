@@ -15,11 +15,11 @@ global:
 main:
   # Selecting a variant loads variants/<name>/values-<name>.yaml when the
   # variants/ folder is present (global.vpNewFolderDir=true).
-  # ds-drpartner-s4 = partner CSI + hub S4 + ODF productization of the
+  # ds-drp-s4 = partner CSI + hub S4 + ODF productization of the
   # multicluster orchestrator (odf-multicluster-orchestrator) without the
   # rest of ODF (no RHDR preview catalog/IDMS/subscription).
   # odf remains the documented default in pattern-metadata.yaml.
-  variant: ds-drpartner-s4
+  variant: ds-drp-s4
   multiSourceConfig:
     enabled: true
     # Need >= 0.9.57 for variants/ folder path helpers (vpNewFolderDir).

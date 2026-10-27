@@ -1,6 +1,6 @@
 ---
 clusterGroup:
-  name: ds-drpartner-s4
+  name: ds-drp-s4
   isHubCluster: true
   namespaces:
     cluster-ca-mgt: {}
@@ -69,7 +69,7 @@ clusterGroup:
       chart: ensure-openshift-console-plugins
       chartVersion: 0.1.*
       extraValueFiles:
-        - '$patternref/variants/ds-drpartner-s4/values-console-plugins-hub.yaml'
+        - '$patternref/variants/ds-drp-s4/values-console-plugins-hub.yaml'
 
     opp-policy:
       name: opp-policy
@@ -95,7 +95,7 @@ clusterGroup:
           - ServerSideApply=true
       extraValueFiles:
         - '$patternref/overrides/values-cluster-names.yaml'
-        - '$patternref/variants/ds-drpartner-s4/values-opp-policy.yaml'
+        - '$patternref/variants/ds-drp-s4/values-opp-policy.yaml'
       ignoreDifferences:
       - group: operators.openshift.io
         kind: Console
@@ -188,7 +188,7 @@ clusterGroup:
           - RespectIgnoreDifferences=true
       extraValueFiles:
         - '/overrides/values-cluster-names.yaml'
-        - '$patternref/variants/ds-drpartner-s4/values-regional-dr.yaml'
+        - '$patternref/variants/ds-drp-s4/values-regional-dr.yaml'
       ignoreDifferences:
         - group: internal.open-cluster-management.io
           kind: ManagedClusterInfo

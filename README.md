@@ -30,7 +30,7 @@ Spoke BOMs nest under the install variant as
 |---------|--------|---------|
 | `odf` (metadata default) | `main.variant: odf` | Baseline: full ODF Regional DR + Virtualization; `byoc: true` |
 | `drpartner-s4` | `main.variant: drpartner-s4` | Partner CSI + hub S4: OADP, OCP-V, preview RHDR; infrastructure DRClusters + `2m-novm` DRPolicy (no `2m-vm`/DRPC/VMs); Submariner disabled; `byoc: true` |
-| `ds-drpartner-s4` (current `values-global.yaml` selection) | `main.variant: ds-drpartner-s4` | Partner CSI + hub S4: like `drpartner-s4`, but uses the ODF productization of the multicluster orchestrator (`odf-multicluster-orchestrator`) without the rest of ODF (no ODF storage, RHDR, or MirrorPeer; inherits productized spoke Subscription defaults); `byoc: true` |
+| `ds-drp-s4` (current `values-global.yaml` selection) | `main.variant: ds-drp-s4` | Partner CSI + hub S4: like `drpartner-s4`, but uses the ODF productization of the multicluster orchestrator (`odf-multicluster-orchestrator`) without the rest of ODF (no ODF storage, RHDR, or MirrorPeer; inherits productized spoke Subscription defaults); `byoc: true` |
 | `drpartner-minimal` | `main.variant: drpartner-minimal` | Partner CSI without S4, Submariner, or DRCluster sync/validation: OADP, OCP-V, preview RHDR; Hive/BYOC only (`byoc: true`) |
 
 Layout:
@@ -46,8 +46,8 @@ variants/
     values-resilient.yaml              # partner spoke BOM (no ODF; preview RHDR catalog/IDMS)
     values-regional-dr.yaml            # infrastructureEnabled: DRClusters + 2m-novm only + hub s3StoreProfiles; byoc: true
     values-console-plugins-*.yaml
-  ds-drpartner-s4/
-    values-ds-drpartner-s4.yaml        # odf-multicluster-orchestrator (productized MCO; no RHDR catalog/IDMS)
+  ds-drp-s4/
+    values-ds-drp-s4.yaml        # odf-multicluster-orchestrator (productized MCO; no RHDR catalog/IDMS)
     values-resilient.yaml              # partner spoke BOM (no ODF; no RHDR catalog/IDMS)
     values-regional-dr.yaml            # infrastructureEnabled: DRClusters + 2m-drpolicy only; drClusterOperator edits skipped (ODF defaults); byoc: true
     values-opp-policy.yaml             # submariner.enabled: false
@@ -67,14 +67,14 @@ overrides/                             # shared hub/spoke chart overrides
 |---------|----------------|---------------------|---------|----------------|
 | `odf` | MirrorPeer / MCO | MirrorPeer / MCO | ODF | opp-policy `s3CaInjector` |
 | `drpartner-s4` | regionaldr (`ramen.infrastructureEnabled`) | regionaldr upsert (`ensureBuckets: false`) | **vp-s4-storage** `s4Role.buckets` | opp-policy `s3CaInjector` |
-| `ds-drpartner-s4` | regionaldr (`ramen.infrastructureEnabled`) | regionaldr upsert (`ensureBuckets: false`) | **vp-s4-storage** `s4Role.buckets` | opp-policy `s3CaInjector` |
+| `ds-drp-s4` | regionaldr (`ramen.infrastructureEnabled`) | regionaldr upsert (`ensureBuckets: false`) | **vp-s4-storage** `s4Role.buckets` | opp-policy `s3CaInjector` |
 | `drpartner-minimal` | none | none | none | n/a |
 
 Example — set the variant in [`values-global.yaml`](values-global.yaml):
 
 ```yaml
 main:
-  variant: ds-drpartner-s4
+  variant: ds-drp-s4
 ```
 
 Control-test chart pins (until published on charts.validatedpatterns.io):
@@ -86,7 +86,7 @@ Control-test chart pins (until published on charts.validatedpatterns.io):
 | regionaldr-with-virt | 0.1.0 | `conditionalize_resources` |
 | vp-manage-proxy-cluster-ca | 0.2.1 | `eso-externalsecret-argocd-sync` |
 
-`ds-drpartner-s4` expectations after sync: identical plumbing to `drpartner-s4` (s3-ssl/CA via **opp-policy** with Submariner disabled, hub **vp-s4-storage** buckets, infra DRClusters + single `2m-drpolicy` DRPolicy, `ensureBuckets: false`, `byoc: true`), except the hub installs **`odf-multicluster-orchestrator`** from the productized ODF catalog instead of preview RHDR, no preview RHDR catalog index/IDMS exists on hub or spokes, and regionaldr skips the `drClusterOperator` CSV edit so the spoke `ramen-dr-cluster` Subscription uses the packaged ODF defaults (`ramenOpsNamespace` and `openshift-dr-system` are still patched).
+`ds-drp-s4` expectations after sync: identical plumbing to `drpartner-s4` (s3-ssl/CA via **opp-policy** with Submariner disabled, hub **vp-s4-storage** buckets, infra DRClusters + single `2m-drpolicy` DRPolicy, `ensureBuckets: false`, `byoc: true`), except the hub installs **`odf-multicluster-orchestrator`** from the productized ODF catalog instead of preview RHDR, no preview RHDR catalog index/IDMS exists on hub or spokes, and regionaldr skips the `drClusterOperator` CSV edit so the spoke `ramen-dr-cluster` Subscription uses the packaged ODF defaults (`ramenOpsNamespace` and `openshift-dr-system` are still patched).
 
 `drpartner-s4` expectations after sync: s3-ssl/CA via **opp-policy** (Submariner disabled in `values-opp-policy.yaml`), hub **vp-s4-storage** (buckets via `s4Role.buckets`), preview RHDR (catalog + IDMS + `rhdr-multicluster-operator`; testing only), CNV, and OADP present;
 no odf-dr, MirrorPeer, or ODF StorageSystem; regionaldr with `ramen.infrastructureEnabled` creates DRClusters, a single `2m-novm` DRPolicy (no `2m-vm`), and upserts hub
@@ -95,9 +95,9 @@ s3StoreProfiles only (`ensureBuckets: false`; no DRPC/VMs); opp-policy injects `
 `drpartner-minimal` expectations after sync: same preview RHDR catalog/IDMS/subscription and partner operators/plumbing without **vp-s4-storage** or Submariner (`submariner.enabled: false` in opp-policy); regionaldr with both
 `ramen.resourcesEnabled` and `ramen.infrastructureEnabled` false (no DRPolicy, DRClusters, validation, or S3 profile/bucket work); `byoc: true`.
 
-### Secrets for `drpartner-s4` / `ds-drpartner-s4` (`values-secret`)
+### Secrets for `drpartner-s4` / `ds-drp-s4` (`values-secret`)
 
-Copy [`values-secret.yaml.template`](values-secret.yaml.template) to `values-secret.yaml` (gitignored) and load secrets before/with install. In addition to the shared pattern secrets (`aws`, `openshiftPullSecret`, `vm-ssh`, `cloud-init`), **`drpartner-s4` and `ds-drpartner-s4` require two Vault secrets** for hub **vp-s4-storage**. Paths must match the chart overrides in `variants/drpartner-s4/values-drpartner-s4.yaml` (or `variants/ds-drpartner-s4/values-ds-drpartner-s4.yaml`) (`s4UICredentials.vaultKey` / `s4APICredentials.vaultKey`).
+Copy [`values-secret.yaml.template`](values-secret.yaml.template) to `values-secret.yaml` (gitignored) and load secrets before/with install. In addition to the shared pattern secrets (`aws`, `openshiftPullSecret`, `vm-ssh`, `cloud-init`), **`drpartner-s4` and `ds-drp-s4` require two Vault secrets** for hub **vp-s4-storage**. Paths must match the chart overrides in `variants/drpartner-s4/values-drpartner-s4.yaml` (or `variants/ds-drp-s4/values-ds-drp-s4.yaml`) (`s4UICredentials.vaultKey` / `s4APICredentials.vaultKey`).
 
 | Vault secret | Keys | Purpose |
 |--------------|------|---------|

@@ -2,7 +2,7 @@
 
 v1.3 - October 2026
 
-* Add `ds-drpartner-s4` variant: partner CSI + hub S4 using the ODF
+* Add `ds-drp-s4` variant: partner CSI + hub S4 using the ODF
   productization of the multicluster orchestrator (`odf-multicluster-orchestrator`
   subscription) without the rest of ODF (no ODF storage, RHDR preview
   catalog/IDMS, or MirrorPeer). Variant documents: `regionaldr` patches only
