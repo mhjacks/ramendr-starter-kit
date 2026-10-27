@@ -2,6 +2,13 @@
 
 v1.3 - October 2026
 
+* Add `ds-drpartner-s4` variant: partner CSI + hub S4 using the ODF
+  productization of the multicluster orchestrator (`odf-multicluster-orchestrator`
+  subscription) without the rest of ODF (no ODF storage, RHDR preview
+  catalog/IDMS, or MirrorPeer). Variant documents: `regionaldr` patches only
+  `ramenOpsNamespace` and `drClusterOperator.namespaceName`; drClusterOperator
+  catalog/package/channel/startingCSV edits are skipped so the productized
+  `ramen-hub-operator-config` defaults drive the spoke Subscription.
 * Add `openshift-observability` application to hub to enable built-in metrics reporting for the ODF variant.
 * Update catalog index tag to `latest` following improvements in the rhdr build process.
 * Unpin `vp-manage-proxy-cluster-ca-sync` declaration in `drpartner-s4` variant to allow tracking 0.2 releases.
